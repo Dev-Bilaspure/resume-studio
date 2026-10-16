@@ -1,16 +1,24 @@
 import "server-only";
 import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 
 /**
- * Where everything lives. Default: next to the app, in the repo it runs from.
+ * Where everything lives. Default: the root of the repo the app runs from (the folder with
+ * pnpm-workspace.yaml, above apps/web).
  *   <root>/resumes/          your resumes (plain folders of .tex files, edit them with anything)
  *   <root>/.resume-studio/   app state: builds, published PDFs, snapshot history
  * Override with RESUME_STUDIO_ROOT=/some/dir.
  */
-// (turbopackIgnore: these are data directories, not files the server bundle needs to trace.)
-export const ROOT = resolve(/*turbopackIgnore: true*/ process.env.RESUME_STUDIO_ROOT ?? process.cwd());
+function repoRoot(): string {
+  // (turbopackIgnore: these are data directories, not files the server bundle needs to trace.)
+  const start = resolve(/*turbopackIgnore: true*/ process.cwd());
+  for (let dir = start; ; dir = dirname(dir)) {
+    if (existsSync(join(/*turbopackIgnore: true*/ dir, "pnpm-workspace.yaml"))) return dir;
+    if (dirname(dir) === dir) return start;
+  }
+}
+export const ROOT = process.env.RESUME_STUDIO_ROOT ? resolve(/*turbopackIgnore: true*/ process.env.RESUME_STUDIO_ROOT) : repoRoot();
 export const RESUMES_DIR = join(ROOT, "resumes");
 export const STATE_DIR = join(ROOT, ".resume-studio");
 export const BUILD_DIR = join(STATE_DIR, "build");
