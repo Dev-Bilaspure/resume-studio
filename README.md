@@ -15,6 +15,22 @@ pnpm dev                            # http://127.0.0.1:4317
 
 Production mode: `pnpm build && pnpm start`. The server only answers on 127.0.0.1.
 
+## Repo layout
+
+A pnpm workspace; [Turborepo](https://turborepo.com) runs `build`, `typecheck`, `test` and `lint` across
+it in dependency order (`pnpm typecheck`, `pnpm test` from the root).
+
+```
+apps/web/                 the editor (Next.js): app, compiler, templates, built-in latexmkrc
+packages/llm/             one interface over Claude Code, OpenAI, Anthropic and Vertex AI
+packages/tailor/          the job-tailoring engine (format-neutral)
+packages/tailor-latex/    the engine's LaTeX adapter
+packages/tailor-cli/      `pnpm tailor <resume-dir> --jd jd.txt --company … --role "…"`
+```
+
+Packages depend one way only (llm ← tailor ← tailor-latex ← cli/web): a cycle makes pnpm link the
+packages into each other endlessly, and the bundler walks that loop until it runs out of memory.
+
 ## Where things live
 
 ```
@@ -122,5 +138,5 @@ pnpm typecheck
 pnpm lint
 ```
 
-Server code is in `src/server/` (compiler, log parser, ATS checks, SyncTeX, snapshots, file watcher),
-the API in `src/app/api/`, the UI in `src/components/`.
+Server code is in `apps/web/src/server/` (compiler, log parser, ATS checks, SyncTeX, snapshots, file watcher),
+the API in `apps/web/src/app/api/`, the UI in `apps/web/src/components/`.
