@@ -171,6 +171,25 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/tailor-cli:
+    dependencies:
+      '@resume-studio/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@resume-studio/tailor':
+        specifier: workspace:*
+        version: link:../tailor
+      '@resume-studio/tailor-latex':
+        specifier: workspace:*
+        version: link:../tailor-latex
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.43
+        version: 20.19.43
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/tailor-latex:
     dependencies:
       '@resume-studio/tailor':

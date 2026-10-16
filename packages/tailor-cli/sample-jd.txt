@@ -1,0 +1,27 @@
+Backend Engineer, Payments Platform
+
+About the team
+The Payments Platform team builds the services that move money for millions of merchants: payment
+orchestration, ledgers, payouts and reconciliation. We run high-throughput, event-driven systems where
+correctness and reliability matter more than anything.
+
+What you'll do
+- Design, build and operate backend services in Go and TypeScript that process millions of transactions a day
+- Build event-driven pipelines on Kafka with exactly-once or idempotent processing guarantees
+- Own services end to end on Kubernetes in AWS: design, deploy, monitor, and on-call
+- Improve reliability: retries, idempotency, circuit breaking, graceful degradation, observability
+- Work with product and finance teams on reconciliation and reporting
+
+What you'll need
+- 2+ years building production backend services
+- Strong experience with Go, or with TypeScript/Node.js and willingness to learn Go
+- Experience with Kafka or a similar message broker
+- Experience with PostgreSQL and data modeling
+- Experience running services on Kubernetes and AWS
+- Understanding of distributed systems: ordering, delivery guarantees, failure handling
+
+Nice to have
+- Fintech, lending or payments domain experience
+- Terraform or other infrastructure-as-code
+- gRPC / Protocol Buffers
+- Experience with workflow engines such as Temporal

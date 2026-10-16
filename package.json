@@ -8,7 +8,8 @@
     "start": "pnpm --filter @resume-studio/web start",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "turbo run lint"
+    "lint": "turbo run lint",
+    "tailor": "node packages/tailor-cli/bin/resume-tailor.js"
   },
   "devDependencies": {
     "turbo": "^2.6.0"
