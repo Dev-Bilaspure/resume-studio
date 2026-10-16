@@ -171,6 +171,19 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/tailor-latex:
+    dependencies:
+      '@resume-studio/tailor':
+        specifier: workspace:*
+        version: link:../tailor
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.43
+        version: 20.19.43
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
 packages:
 
   '@ai-sdk/anthropic@4.0.81':

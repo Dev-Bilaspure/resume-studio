@@ -1,0 +1,20 @@
+{
+  "name": "@resume-studio/tailor-latex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "node --experimental-strip-types --no-warnings --test 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "@resume-studio/tailor": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}

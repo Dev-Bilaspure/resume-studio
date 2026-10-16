@@ -1,0 +1,118 @@
+% !TEX program = pdflatex
+% Classic — single column, serif (XCharter). Built to be read correctly by applicant tracking systems:
+%  * one column, standard section names, no tables, icons, images or text boxes;
+%  * every glyph maps back to real Unicode text (glyphtounicode), and f-ligatures are off,
+%    so "fi"/"fl" never extract as one unknown character;
+%  * no hyphenation, so a keyword is never split across lines ("Kuber-netes");
+%  * contact details are plain visible text (an ATS reads the text, not the link target), and each
+%    item is unbreakable (\mbox) so a phone number or city never splits across lines;
+%  * entries read left to right, dates inline: no right-aligned columns for a parser to misread.
+\documentclass[11pt]{article}
+
+% ---- Page ---------------------------------------------------------------------------------------
+\usepackage[letterpaper,margin=0.6in]{geometry} % use a4paper outside North America
+\pagestyle{empty}
+
+% ---- Fonts & text extraction (keep these: they are what makes the PDF machine-readable) ----------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[sups]{XCharter}
+\input{glyphtounicode}
+\pdfgentounicode=1
+\usepackage[final,protrusion=true,expansion=true]{microtype}
+\DisableLigatures[f]{encoding = *, family = *}
+
+% ---- Layout ---------------------------------------------------------------------------------------
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+\raggedright
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0pt}
+
+\titleformat{\section}{\large\bfseries}{}{0pt}{}[\vspace{1pt}\titlerule]
+\titlespacing*{\section}{0pt}{9pt}{5pt}
+
+\setlist[itemize]{leftmargin=1.1em, label=\textbullet, itemsep=1.5pt, parsep=0pt, topsep=2pt, partopsep=0pt}
+
+% Reading order: many ATS parsers read right-aligned (\hfill) text as a separate column and attach
+% it to the wrong entry (or to nothing). So every entry is written left to right, with the dates inline;
+% the ATS check flags any right-aligned text that a parser separates from its line.
+%
+% \sep: separator; a line may break after it, never inside an item
+\newcommand{\sep}{\unskip\kern0.5em\textbar\hspace{0.5em}}
+% \role{Title}{Dates}{Company}{Location}
+\newcommand{\role}[4]{%
+  \textbf{#1}\par
+  \textit{#3}\sep #4\sep #2\par}
+% \project{Name}{Tech / link}
+\newcommand{\project}[2]{\textbf{#1}\sep #2\par}
+% \degree{Degree}{Dates}{School}{Location}
+\newcommand{\degree}[4]{\textbf{#1}\sep #3, #4\sep #2\par}
+
+\hypersetup{
+  pdftitle={Alex Morgan — Resume},
+  pdfauthor={Alex Morgan},
+  pdfsubject={Resume},
+  pdfkeywords={Software Engineer, Distributed Systems, Go, Kubernetes}
+}
+
+\begin{document}
+
+% ---- Header ---------------------------------------------------------------------------------------
+\begin{center}
+  {\fontsize{22}{26}\selectfont\bfseries Alex Morgan}\par\vspace{3pt}
+  Senior Software Engineer\sep \mbox{San Francisco, CA}\par\vspace{2pt}
+  \mbox{\href{mailto:alex.morgan@example.com}{alex.morgan@example.com}}\sep
+  \mbox{(415) 555-0134}\sep
+  \mbox{\href{https://linkedin.com/in/alexmorgan}{linkedin.com/in/alexmorgan}}\sep
+  \mbox{\href{https://github.com/alexmorgan}{github.com/alexmorgan}}
+\end{center}
+
+% ---- Summary --------------------------------------------------------------------------------------
+\section{Summary}
+Backend engineer with 8 years building high-throughput distributed systems in Go and Kubernetes.
+Led the redesign of a payments platform processing \$2B a year, cutting p99 latency by 75\% and
+on-call pages by 60\%.
+
+% ---- Experience -----------------------------------------------------------------------------------
+\section{Experience}
+\role{Senior Software Engineer}{Mar 2022 -- Present}{Foo Payments}{San Francisco, CA}
+\begin{itemize}
+  \item Cut p99 checkout latency from 480\,ms to 120\,ms by moving synchronous fraud checks to Kafka consumers.
+  \item Led a team of 5 to migrate 40 services from VMs to Kubernetes (EKS), reducing infrastructure cost by 32\%.
+  \item Designed an idempotent ledger API in Go handling 12k requests per second at 99.99\% availability.
+  \item Introduced SLOs and error budgets across 9 teams; on-call pages dropped 60\% in two quarters.
+\end{itemize}
+
+\vspace{4pt}
+\role{Software Engineer}{Jun 2018 -- Feb 2022}{Bar Analytics}{Remote}
+\begin{itemize}
+  \item Built a streaming ingestion pipeline (Kafka, Flink, PostgreSQL) for 3B events a day.
+  \item Reduced nightly batch runtime from 6 hours to 40 minutes by partitioning jobs on Spark.
+  \item Mentored 4 junior engineers; two were promoted within a year.
+\end{itemize}
+
+% ---- Projects -------------------------------------------------------------------------------------
+\section{Projects}
+\project{ratelimitd}{Go, Redis \sep github.com/alexmorgan/ratelimitd}
+\begin{itemize}
+  \item Open-source distributed rate limiter with 2.1k GitHub stars, used in production by 30+ companies.
+\end{itemize}
+
+% ---- Education ------------------------------------------------------------------------------------
+\section{Education}
+\degree{B.S. Computer Science}{2014 -- 2018}{University of California, Berkeley}{Berkeley, CA}
+
+% ---- Skills ---------------------------------------------------------------------------------------
+\section{Skills}
+\textbf{Languages:} Go, Python, Java, SQL, TypeScript\par
+\textbf{Infrastructure:} Kubernetes, Docker, Terraform, AWS (EKS, RDS, S3), GCP\par
+\textbf{Data:} Kafka, PostgreSQL, Redis, Flink, Spark\par
+\textbf{Practices:} Distributed systems, API design, observability (Prometheus, Grafana), SRE
+
+\end{document}
