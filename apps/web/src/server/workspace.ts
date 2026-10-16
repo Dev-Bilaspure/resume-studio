@@ -45,6 +45,17 @@ const MetaSchema = z.object({
   engine: z.enum(["pdflatex", "xelatex", "lualatex", "latex"]).default("pdflatex"),
   trusted: z.boolean().default(false),
   haltOnError: z.boolean().default(false),
+  application: z
+    .object({
+      company: z.string(),
+      role: z.string(),
+      link: z.string().optional(),
+      baseResume: z.string(),
+      session: z.string(),
+      createdAt: z.string(),
+      status: z.enum(["draft", "applied", "interviewing", "offer", "rejected", "withdrawn"]).default("draft"),
+    })
+    .optional(),
   mainFile: z.string().min(1).default("main.tex"),
   template: z.string().optional(),
   createdAt: z.string().optional(),
@@ -119,6 +130,7 @@ export async function getResume(id: string): Promise<ResumeMeta> {
     template: parsed.success ? parsed.data.template : undefined,
     trusted: parsed.success ? parsed.data.trusted : false,
     haltOnError: parsed.success ? parsed.data.haltOnError : false,
+    application: parsed.success ? parsed.data.application : undefined,
     createdAt: (parsed.success && parsed.data.createdAt) || st.birthtime.toISOString(),
     updatedAt: (parsed.success && parsed.data.updatedAt) || st.mtime.toISOString(),
   };
@@ -140,10 +152,10 @@ export async function listResumes(): Promise<ResumeMeta[]> {
 }
 
 async function writeMeta(id: string, meta: Omit<ResumeMeta, "id">) {
-  const { name, engine, mainFile, template, trusted, haltOnError, createdAt, updatedAt } = meta;
+  const { name, engine, mainFile, template, trusted, haltOnError, application, createdAt, updatedAt } = meta;
   await atomicWrite(
     join(resumeDir(id), META_FILE),
-    JSON.stringify({ name, engine, mainFile, template, trusted, haltOnError, createdAt, updatedAt }, null, 2) + "\n",
+    JSON.stringify({ name, engine, mainFile, template, trusted, haltOnError, application, createdAt, updatedAt }, null, 2) + "\n",
   );
 }
 
@@ -249,7 +261,7 @@ export async function createResumeFromFolder(name: string, populate: (dest: stri
 
 export async function updateResume(
   id: string,
-  patch: { name?: string; engine?: Engine; mainFile?: string; trusted?: boolean; haltOnError?: boolean },
+  patch: { name?: string; engine?: Engine; mainFile?: string; trusted?: boolean; haltOnError?: boolean; application?: ResumeMeta["application"] },
 ): Promise<ResumeMeta> {
   const meta = await getResume(id);
   if (patch.mainFile) {

@@ -21,8 +21,24 @@ export interface ResumeMeta {
   trusted: boolean;
   /** Stop at the first error instead of carrying on to produce (partial) output. */
   haltOnError: boolean;
+  /** Set on a resume tailored for a job: what it's for, and where it came from. */
+  application?: Application;
   createdAt: string;
   updatedAt: string;
+}
+
+export type ApplicationStatus = "draft" | "applied" | "interviewing" | "offer" | "rejected" | "withdrawn";
+
+export interface Application {
+  company: string;
+  role: string;
+  link?: string;
+  /** The resume this one was tailored from. */
+  baseResume: string;
+  /** The tailoring session (its full record is in tailor.json next to the resume). */
+  session: string;
+  createdAt: string;
+  status: ApplicationStatus;
 }
 
 export interface FileEntry {
@@ -150,7 +166,8 @@ export type ServerEvent =
   | { type: "build"; result: BuildResult }
   | { type: "files"; resumeId: string; changes: { path: string; hash: string | null }[] }
   | { type: "resumes" }
-  | { type: "snapshots"; resumeId: string };
+  | { type: "snapshots"; resumeId: string }
+  | { type: "tailor"; sessionId: string; resumeId: string; status: string; message: string; step?: string };
 
 /** Completions gathered from every file in the project (see src/server/symbols.ts). */
 export interface ProjectSymbols {

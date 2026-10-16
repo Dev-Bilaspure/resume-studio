@@ -53,6 +53,18 @@ importers:
       '@replit/codemirror-vim':
         specifier: ^6.4.0
         version: 6.4.0(@codemirror/commands@6.11.1)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/view@6.43.14)
+      '@resume-studio/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
+      '@resume-studio/tailor':
+        specifier: workspace:*
+        version: link:../../packages/tailor
+      '@resume-studio/tailor-latex':
+        specifier: workspace:*
+        version: link:../../packages/tailor-latex
+      ai-sdk-provider-claude-code:
+        specifier: 4.3.3
+        version: 4.3.3(@anthropic-ai/sdk@0.135.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(zod@4.6.7))(zod@4.6.7)
       chokidar:
         specifier: ^5.0.0
         version: 5.0.0
