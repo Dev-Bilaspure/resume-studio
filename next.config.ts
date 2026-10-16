@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The floating dev-tools badge would sit on top of the file sidebar.
+  devIndicators: false,
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# PDF.js runtime assets (copied from node_modules by scripts/copy-pdfjs.mjs)
+/public/pdfjs/
+
+# Your resumes and the app's state (builds, snapshot history). Personal data, never committed to the app repo.
+/resumes/
+/.resume-studio/
