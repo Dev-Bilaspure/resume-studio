@@ -1,0 +1,142 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { GenerateRequest, LLM } from "@resume-studio/llm";
+import type { FormatAdapter } from "./adapters.ts";
+import { createTailorEngine } from "./engine.ts";
+import type { ResumeDoc } from "./types.ts";
+
+// A scripted model: answers by schema name, so the engine's control flow can be tested without a provider.
+function scriptedLLM(script: Record<string, (req: GenerateRequest<unknown>) => unknown>): LLM & { calls: string[] } {
+  const calls: string[] = [];
+  return {
+    provider: "claude-code",
+    model: "test",
+    calls,
+    async generate<T>(req: GenerateRequest<T>) {
+      const name = req.schemaName ?? "";
+      calls.push(name);
+      const f = script[name];
+      if (!f) throw new Error(`no script for ${name}`);
+      return { data: req.schema.parse(f(req as GenerateRequest<unknown>)), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 }, provider: "claude-code", model: "test", durationMs: 1 };
+    },
+  };
+}
+
+const doc: ResumeDoc = {
+  header: "Dev",
+  headline: { id: "h1", text: "Software Engineer" },
+  sections: [
+    {
+      id: "sec1",
+      kind: "experience",
+      title: "Experience",
+      context: "",
+      skills: [],
+      lists: [{ id: "l1", heading: "Acme", bullets: [
+        { id: "b1", text: "Built **Node.js** services on **AWS Lambda**." },
+        { id: "b2", text: "Cut failures **60%** with **Temporal**." },
+        { id: "b3", text: "Developed a **React** editor." },
+      ] }],
+    },
+  ],
+  plainText: "",
+};
+
+// The adapter records what it was asked to apply.
+const applied: string[][] = [];
+const adapter: FormatAdapter = {
+  format: "test",
+  parse: () => structuredClone(doc),
+  apply: (source, _d, edits) => {
+    applied.push(edits.map((e) => e.id));
+    return source;
+  },
+};
+
+const edit = (op: string, target: string, text: string | null, evidence: string[] = [target]) => ({
+  op,
+  target,
+  text,
+  after: null,
+  order: null,
+  reason: "r",
+  requirements: ["r1"],
+  evidence: evidence.map((id) => ({ kind: "bullet", id })),
+});
+
+const profile = {
+  roleFamily: "backend",
+  seniority: "mid",
+  summary: "s",
+  requirements: [{ text: "Kubernetes", kind: "must", category: "infrastructure", keywords: ["Kubernetes"] }],
+  keywords: [{ term: "Kubernetes", aliases: ["K8s"], importance: "must", kind: "term" }],
+  responsibilities: [],
+  dealBreakers: [],
+};
+
+test("every proposed edit is accounted for: kept, repaired or shown as dropped", async () => {
+  const llm = scriptedLLM({
+    job_profile: () => profile,
+    requirement_matches: () => ({ matches: [{ requirementId: "r1", status: "missing", evidence: [], note: "n" }], questions: [] }),
+    resume_edits: (req) =>
+      String(req.system).includes("fixing resume edits")
+        ? { strategy: "fixed", edits: [edit("rewrite_bullet", "b2", "Cut failures **60%** with **Temporal** workflows.")] }
+        : {
+            strategy: "s",
+            edits: [
+              edit("set_headline", "h1", "Backend Engineer", ["b1"]),
+              edit("rewrite_bullet", "b1", "Built **Node.js** services on **AWS Lambda** at 10M requests/day."), // invented number → repair fails (no fix returned)
+              edit("rewrite_bullet", "b2", "Led a platform team cutting failures **60%** with **Temporal**."), // judge: unsupported → repaired
+              edit("remove_bullet", "b3", null),
+            ],
+          },
+    fact_check: (req) => ({
+      verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">\nBEFORE: [^\n]*\nAFTER: ([^\n]*)/g)].map((m) => ({
+        editId: m[1],
+        verdict: m[2].startsWith("Led a platform team") ? "unsupported" : "supported",
+        problems: m[2].startsWith("Led a platform team") ? ["“Led a platform team” isn't in the evidence"] : [],
+      })),
+    }),
+  });
+  const engine = createTailorEngine({ llm, adapter });
+  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s = await engine.run(s0.id);
+  assert.equal(s.status, "ready", s.error?.message);
+  const byTarget = Object.fromEntries((s.edits ?? []).map((e) => [`${e.change.op}:${e.change.target}:${e.status}`, e]));
+  assert.deepEqual(Object.keys(byTarget).sort(), ["remove_bullet:b3:ok", "rewrite_bullet:b1:dropped", "rewrite_bullet:b2:ok", "set_headline:h1:ok"].sort());
+  assert.match(byTarget["rewrite_bullet:b2:ok"].issues!.join(), /Revised after the fact-check: “Led a platform team”/);
+  assert.match(byTarget["rewrite_bullet:b1:dropped"].issues!.join(), /10M/);
+  assert.equal((byTarget["rewrite_bullet:b2:ok"].change as { text: string }).text, "Cut failures **60%** with **Temporal** workflows.");
+  // Ids are unique, and only kept edits reach the document.
+  const ids = s.edits!.map((e) => e.id);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.deepEqual(applied.at(-1)!.sort(), s.edits!.filter((e) => e.status !== "dropped").map((e) => e.id).sort());
+});
+
+test("questions pause the session; answers become facts and resume it", async () => {
+  const llm = scriptedLLM({
+    job_profile: () => profile,
+    requirement_matches: () => ({
+      matches: [{ requirementId: "r1", status: "missing", evidence: [], note: "n" }],
+      questions: [{ requirementId: "r1", topic: "Kubernetes", question: "Have you run services on Kubernetes?" }],
+    }),
+    facts: () => ({ facts: [{ questionId: "q1", text: "Ran the Temporal workers on Kubernetes (AKS).", skills: ["Kubernetes"] }] }),
+    resume_edits: (req) => {
+      const fact = /FACT \[(f-[^\]]+)\]/.exec(String(req.prompt))?.[1];
+      return { strategy: "s", edits: [{ ...edit("rewrite_bullet", "b2", "Cut failures **60%** with **Temporal** workers on **Kubernetes**."), evidence: [{ kind: "bullet", id: "b2" }, { kind: "fact", id: fact }] }] };
+    },
+    fact_check: () => ({ verdicts: [] }),
+  });
+  const engine = createTailorEngine({ llm, adapter });
+  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const paused = await engine.run(s0.id);
+  assert.equal(paused.status, "needs_input");
+  assert.equal(paused.questions![0].id, "q1");
+  await engine.answer(s0.id, [{ questionId: "q1", text: "I ran our Temporal workers on AKS." }]);
+  const done = await engine.run(s0.id);
+  assert.equal(done.status, "ready", done.error?.message);
+  assert.equal(done.newFacts.length, 1);
+  assert.equal(done.matches![0].status, "strong");
+  assert.equal(done.edits![0].status, "ok", done.edits![0].issues?.join());
+  assert.deepEqual(llm.calls, ["job_profile", "requirement_matches", "facts", "resume_edits", "fact_check"]);
+});
