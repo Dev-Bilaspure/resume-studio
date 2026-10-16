@@ -1,0 +1,46 @@
+import { z } from "zod";
+import { body, handler, noStore } from "@/server/api";
+import { dropCompiler } from "@/server/compiler";
+import { emit } from "@/server/events";
+import { compilerFor } from "@/server/runtime";
+import { createSnapshot } from "@/server/snapshots";
+import { getResume, listFiles, trashResume, updateResume } from "@/server/workspace";
+
+type Ctx = { params: Promise<{ id: string }> };
+
+export const GET = handler(async (_req: Request, { params }: Ctx) => {
+  const { id } = await params;
+  const meta = await getResume(id);
+  const [files, compiler] = await Promise.all([listFiles(id), compilerFor(id)]);
+  const build = compiler.state();
+  // First open after a restart, or a resume made outside the app: build it now.
+  if (!build.last && !build.running) compiler.schedule();
+  return Response.json({ meta, files, build: compiler.state() }, { headers: noStore });
+});
+
+const Patch = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  engine: z.enum(["pdflatex", "xelatex", "lualatex", "latex"]).optional(),
+  mainFile: z.string().min(1).optional(),
+  trusted: z.boolean().optional(),
+  haltOnError: z.boolean().optional(),
+});
+
+export const PATCH = handler(async (req: Request, { params }: Ctx) => {
+  const { id } = await params;
+  const meta = await updateResume(id, await body(req, Patch));
+  emit({ type: "resumes" });
+  (await compilerFor(id)).schedule(true);
+  return Response.json(meta);
+});
+
+export const DELETE = handler(async (_req: Request, { params }: Ctx) => {
+  const { id } = await params;
+  await getResume(id);
+  // Snapshot first: the history keeps the resume even after the folder goes to the trash.
+  await createSnapshot(id, { message: "Before deleting the resume", auto: true }).catch(() => null);
+  await trashResume(id);
+  dropCompiler(id);
+  emit({ type: "resumes" });
+  return new Response(null, { status: 204 });
+});
