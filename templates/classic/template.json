@@ -1,0 +1,1 @@
+{ "name": "Classic", "description": "Serif (XCharter), centered header, ruled sections. The safest choice for any ATS.", "engine": "pdflatex", "order": 1 }

@@ -1,0 +1,33 @@
+% !TEX program = pdflatex
+% Blank — the ATS-safe preamble with no content. Start here to bring in your own resume.
+\documentclass[11pt]{article}
+
+\usepackage[letterpaper,margin=0.6in]{geometry} % use a4paper outside North America
+\pagestyle{empty}
+
+% Text extraction: keep these so every glyph maps to real Unicode text.
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\input{glyphtounicode}
+\pdfgentounicode=1
+\usepackage[final]{microtype}
+\DisableLigatures[f]{encoding = *, family = *}
+
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\hypersetup{pdftitle={Your Name — Resume}, pdfauthor={Your Name}}
+
+\raggedright
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+\setlength{\parindent}{0pt}
+
+\begin{document}
+
+{\LARGE\bfseries Your Name}\par
+\mbox{you@example.com} \textbar\ \mbox{(555) 555-0100} \textbar\ \mbox{linkedin.com/in/you}
+
+\section*{Experience}
+
+\end{document}
