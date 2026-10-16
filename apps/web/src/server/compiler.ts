@@ -82,7 +82,7 @@ export async function compileDir(opts: CompileOptions): Promise<RawCompile> {
       ENGINE_FLAG[opts.engine],
       "-norc", // no user/system latexmkrc: every machine builds the same way
       ...(existsSync(BUILTIN_RC) ? ["-r", BUILTIN_RC] : []),
-      ...(opts.trusted ? PROJECT_RC.filter((f) => existsSync(join(opts.srcDir, f))).flatMap((f) => ["-r", join(opts.outDir, f)]) : []),
+      ...(opts.trusted ? PROJECT_RC.filter((f) => existsSync(join(/*turbopackIgnore: true*/ opts.srcDir, f))).flatMap((f) => ["-r", join(/*turbopackIgnore: true*/ opts.outDir, f)]) : []),
       ...(opts.trusted ? ["-shell-escape"] : []),
       // Overleaf's default: carry on past errors (latexmk -f), so bibliography and cross-reference
       // passes still run and the partial PDF is as complete as it can be.
