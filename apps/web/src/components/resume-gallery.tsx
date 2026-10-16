@@ -1,14 +1,16 @@
 "use client";
 
-import { Copy, FileText, Loader2, MoreHorizontal, Plus, TriangleAlert, Upload } from "lucide-react";
+import { Copy, FileText, Loader2, MoreHorizontal, Plus, Settings2, Sparkles, TriangleAlert, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { AiSettingsDialog } from "@/components/ai/ai-settings-dialog";
 import { NewResumeDialog } from "@/components/new-resume-dialog";
+import { TailoringStrip } from "@/components/tailor/tailoring-strip";
 import { PdfThumb } from "@/components/preview/pdf-thumb";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type ResumeSummary } from "@/lib/api";
 import { relativeTime } from "@/lib/format";
@@ -36,6 +38,7 @@ export function ResumeGallery() {
   const [system, setSystem] = useState<SystemStatus | null>(null);
   const [creating, setCreating] = useState<{ duplicateOf: ResumeSummary | null } | null>(null);
   const [importing, setImporting] = useState(false);
+  const [aiSettings, setAiSettings] = useState(false);
   const zipInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -91,9 +94,16 @@ export function ResumeGallery() {
               {importing ? <Loader2 className="animate-spin" /> : <Upload />}
               Import .zip
             </Button>
-            <Button size="sm" onClick={() => setCreating({ duplicateOf: null })}>
+            <Button size="sm" variant="outline" onClick={() => setCreating({ duplicateOf: null })}>
               <Plus />
               New resume
+            </Button>
+            <Button size="sm" variant="ghost" aria-label="AI providers" title="AI providers" onClick={() => setAiSettings(true)}>
+              <Settings2 />
+            </Button>
+            <Button size="sm" nativeButton={false} render={<Link href="/tailor/new" />}>
+              <Sparkles />
+              Tailor for a job
             </Button>
           </div>
         </div>
@@ -121,6 +131,8 @@ export function ResumeGallery() {
             </p>
           </div>
         )}
+
+        <TailoringStrip savedSessions={new Set((resumes ?? []).flatMap((r) => (r.application?.session ? [r.application.session] : [])))} />
 
         <div className="mb-6 flex items-end justify-between">
           <div>
@@ -175,6 +187,14 @@ export function ResumeGallery() {
                       <p className="min-w-0 flex-1 truncate text-sm font-medium">{r.name}</p>
                       <ScoreBadge score={r.build.score} />
                     </div>
+                    {r.application && (
+                      <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-primary" title={`Tailored for ${r.application.role} at ${r.application.company}`}>
+                        <Sparkles className="size-3 shrink-0" />
+                        <span className="truncate">
+                          {r.application.company} · {r.application.role}
+                        </span>
+                      </p>
+                    )}
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       Edited {relativeTime(Date.parse(r.updatedAt))}
                       {r.build.pages ? ` · ${r.build.pages} page${r.build.pages === 1 ? "" : "s"}` : ""}
@@ -188,6 +208,11 @@ export function ResumeGallery() {
                       <MoreHorizontal />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => router.push(`/tailor/new?resume=${encodeURIComponent(r.id)}`)}>
+                        <Sparkles />
+                        Tailor for a job…
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => setCreating({ duplicateOf: r })}>
                         <Copy />
                         Duplicate…
@@ -200,6 +225,7 @@ export function ResumeGallery() {
           </ul>
         )}
       </main>
+      <AiSettingsDialog open={aiSettings} onOpenChange={setAiSettings} />
       <NewResumeDialog open={creating !== null} onOpenChange={(o) => !o && setCreating(null)} duplicateOf={creating?.duplicateOf ?? null} />
     </div>
   );

@@ -15,6 +15,7 @@ import {
   RotateCcw,
   TriangleAlert,
   X,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -392,6 +393,16 @@ export function WorkspaceView({ id }: { id: string }) {
         </Link>
         <span className="text-muted-foreground/50">/</span>
         <ResumeSwitcher currentId={id} name={meta.name} />
+        {meta.application && (
+          <Link
+            href={`/tailor/${meta.application.session}`}
+            className="hidden max-w-64 items-center gap-1 truncate rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary hover:bg-primary/15 md:flex"
+            title={`Tailored for ${meta.application.role} at ${meta.application.company}. Open the review.`}
+          >
+            <Sparkles className="size-3 shrink-0" />
+            <span className="truncate">{meta.application.company}</span>
+          </Link>
+        )}
         <SaveIndicator status={ws.saveStatus} />
         <div className="ml-auto flex items-center gap-1.5">
           <BuildPill
@@ -420,6 +431,16 @@ export function WorkspaceView({ id }: { id: string }) {
               </>
             }
           />
+          <Button
+            size="sm"
+            variant="outline"
+            nativeButton={false}
+            render={<Link href={`/tailor/new?resume=${encodeURIComponent(id)}`} />}
+            title="Tailor this resume for a job description"
+          >
+            <Sparkles />
+            <span className="hidden xl:inline">Tailor</span>
+          </Button>
           <SnapshotButton resumeId={id} beforeAction={ws.saveAll} />
           <Button
             size="sm"
