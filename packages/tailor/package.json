@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./node": "./src/node.ts"
+    "./node": "./src/node.ts",
+    "./job": "./src/job.ts"
   },
   "files": [
     "dist",
@@ -20,6 +21,10 @@
       "./node": {
         "types": "./dist/node.d.ts",
         "default": "./dist/node.js"
+      },
+      "./job": {
+        "types": "./dist/job.d.ts",
+        "default": "./dist/job.js"
       }
     }
   },

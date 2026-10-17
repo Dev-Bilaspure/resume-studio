@@ -6,6 +6,8 @@ export { addedBulletId, applyToDoc, docText, mergeFitEdits } from "./doc.ts";
 export { ENGINE_VERSION, SessionError, createTailorEngine, type EngineDeps, type StartInput, type TailorEngine } from "./engine.ts";
 export { LEXICON, canonical, impliedBy, mentions, techTerms, variants } from "./lexicon.ts";
 export { PROMPTS_VERSION, renderDoc } from "./prompts.ts";
+export { readPosting, type PostingDetails } from "./posting.ts";
+export { jobCompany, jobTitle } from "./job.ts";
 export { coverage, markupProblems, numbers, plain, unsupportedNumbers } from "./text.ts";
 export * from "./types.ts";
 export { entryHeading } from "./verify.ts";

@@ -33,8 +33,8 @@ export function renderFacts(facts: Fact[]): string {
 
 function renderJob(job: JobInput): string {
   return [
-    `Company: ${job.company}`,
-    `Role (exact title): ${job.role}`,
+    `Company: ${job.company?.trim() || "(not named in the posting)"}`,
+    `Role (exact title): ${job.role?.trim() || "(not stated: infer the role from the description)"}`,
     job.seniority ? `Level: ${job.seniority}` : null,
     job.location ? `Location: ${job.location}` : null,
     job.notes ? `Candidate's notes: ${job.notes}` : null,
@@ -103,9 +103,29 @@ Rules:
 - "must" = required, "you have", "you'll need", minimum qualifications. "nice" = preferred, bonus, plus, "ideally".
 - Use canonical spellings recruiters search for, and list common variants as aliases.
 - Don't invent requirements the posting doesn't state. Boilerplate (benefits, EEO text) isn't a requirement.
-- The role title and level are given by the candidate; use them as stated.
+- When the role title and level are given, use them as stated; when they aren't, read them from the description.
 ${DATA_NOTE}`,
     prompt: `<job>\n${renderJob(job)}\n</job>\n\nAnalyze this job.`,
+  };
+}
+
+// ---- 0. Read a posting's details (for forms and tools that only have the pasted text) --------------------
+
+export const PostingSchema = z.object({
+  company: z.string().nullable().describe("The hiring company's name exactly as the posting gives it; null if it isn't named."),
+  role: z.string().nullable().describe("The job title exactly as the posting states it; null if it states none."),
+  suggestedRole: z.string().describe("If role is null: a short, conventional title for this job, from what the posting describes. Otherwise the same as role."),
+  seniority: z.enum(["intern", "junior", "mid", "senior", "staff", "principal", "manager"]).nullable().describe("From the title or the experience asked for (0–2 years junior, 2–5 mid, 5–8 senior, 8+ staff); null if there's no signal."),
+  location: z.string().nullable().describe("Where the job is (city, country, remote), as stated; null if not stated."),
+  workModel: z.enum(["onsite", "hybrid", "remote"]).nullable(),
+});
+export type PostingDetails = z.infer<typeof PostingSchema>;
+
+export function postingPrompt(text: string) {
+  return {
+    system: `You read a job posting someone pasted (often with company boilerplate, benefits and legal text around it) and pull out its basic details for a form. Only report what the posting says. Don't guess a company from a description ("a YC-backed Voice AI company" names no company): use null. Use the title exactly as written.
+${DATA_NOTE}`,
+    prompt: `<posting>\n${text.trim().slice(0, 30_000)}\n</posting>`,
   };
 }
 

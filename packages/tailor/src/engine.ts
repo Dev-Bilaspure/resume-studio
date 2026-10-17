@@ -17,6 +17,8 @@ import {
   matchPrompt,
   repairPrompt,
   type EditOutput,
+  PostingSchema,
+  postingPrompt,
 } from "./prompts.ts";
 import { coverage, uid } from "./text.ts";
 import type { Answer, BuildCheck, Edit, Fact, JobInput, JobProfile, Report, Session, SessionStatus, SourceFiles, TailorEvent, TailorOptions } from "./types.ts";
@@ -97,6 +99,18 @@ export function createTailorEngine(deps: EngineDeps) {
   // ---- Steps -----------------------------------------------------------------------------------------------
 
   async function analyze(s: Session, signal?: AbortSignal) {
+    // No company or title given (a pasted posting): take them, and the level and location, from the posting.
+    if ((!s.job.company || !s.job.role) && !s.context._postingRead) {
+      const d = await call(s, "read-posting", { ...postingPrompt(s.job.description), schema: PostingSchema, schemaName: "posting_details", maxOutputTokens: 1_000 }, signal);
+      s.job = {
+        ...s.job,
+        company: s.job.company || d.company?.trim() || "",
+        role: s.job.role || d.role?.trim() || d.suggestedRole?.trim() || "",
+        seniority: s.job.seniority ?? d.seniority ?? undefined,
+        location: s.job.location || d.location?.trim() || undefined,
+      };
+      s.context._postingRead = "1";
+    }
     const out = await call(s, "analyze-job", { ...analyzePrompt(s.job), schema: JobProfileSchema, schemaName: "job_profile" }, signal);
     // Canonical spellings, aliases from the lexicon too, de-duplicated.
     const keywords = new Map<string, JobProfile["keywords"][number]>();
@@ -325,7 +339,8 @@ export function createTailorEngine(deps: EngineDeps) {
   return {
     async start(input: StartInput): Promise<Session> {
       if (!input.job.description?.trim()) throw new SessionError(400, "The job description is empty");
-      if (!input.job.role?.trim() || !input.job.company?.trim()) throw new SessionError(400, "Company and role are required");
+      // Company and title are optional: real postings often leave one out (the engine reads the role from the text).
+      input = { ...input, job: { ...input.job, company: input.job.company?.trim() ?? "", role: input.job.role?.trim() ?? "" } };
       const facts = [...((await deps.facts?.list()) ?? []), ...(input.facts ?? [])];
       const now = new Date().toISOString();
       const s: Session = {
@@ -471,6 +486,7 @@ function order(edits: Edit[]): Edit[] {
 function stepLabel(step: string): string {
   return (
     {
+      "read-posting": "Reading the posting's details",
       "analyze-job": "Reading the job description",
       "match-evidence": "Matching your experience to the requirements",
       "learn-facts": "Adding your answers to your fact bank",

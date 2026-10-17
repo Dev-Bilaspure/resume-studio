@@ -169,3 +169,22 @@ test("a failed run resumes with retry, keeping the steps that finished", async (
   assert.deepEqual(llm.calls.slice(before), ["resume_edits", "fact_check"]);
   assert.equal((await engine.getSession(s0.id)).status, "ready");
 });
+
+test("a pasted posting alone is enough: the engine reads its title, level and location", async () => {
+  const llm = scriptedLLM({
+    posting_details: () => ({ company: null, role: "Founding Engineer", suggestedRole: "Founding Engineer", seniority: "mid", location: "Bangalore", workModel: "onsite" }),
+    job_profile: () => profile,
+    requirement_matches: () => ({ matches: [{ requirementId: "r1", status: "strong", evidence: [{ kind: "bullet", id: "b1" }], note: "n" }], questions: [] }),
+    resume_edits: () => ({ strategy: "s", edits: [] }),
+    fact_check: () => ({ verdicts: [] }),
+  });
+  const engine = createTailorEngine({ llm, adapter });
+  const s0 = await engine.start({ job: { company: "", role: "", description: "A YC-backed Voice AI company is hiring. ".repeat(5) }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s = await engine.run(s0.id);
+  assert.equal(s.status, "ready", s.error?.message);
+  assert.equal(llm.calls[0], "posting_details");
+  assert.deepEqual([s.job.role, s.job.company, s.job.seniority, s.job.location], ["Founding Engineer", "", "mid", "Bangalore"], "an unnamed company stays unnamed");
+  // Retried or resumed, it isn't read twice.
+  await engine.retry(s.id);
+  assert.equal(llm.calls.filter((c) => c === "posting_details").length, 1);
+});

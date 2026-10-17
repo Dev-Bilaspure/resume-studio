@@ -64,8 +64,9 @@ export interface Fact {
 export type Seniority = "intern" | "junior" | "mid" | "senior" | "staff" | "principal" | "manager";
 
 export interface JobInput {
+  /** Empty when the posting doesn't name it. */
   company: string;
-  /** The exact title from the posting. Used verbatim; never inferred. */
+  /** The exact title from the posting, used verbatim. Empty when the posting states none. */
   role: string;
   seniority?: Seniority;
   description: string;
