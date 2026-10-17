@@ -1,12 +1,11 @@
 // What the MCP tools do, independent of the protocol: tailor a resume on this machine, answer the
 // engine's questions, read a session, and save the result as a new folder. Results are written for an
 // assistant to read and relay: what happened, what changed and why, and what to call next.
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { resolve } from "node:path";
 import { createLLM, type LLM, type ProviderConfig } from "@resume-studio/llm";
-import { createTailorEngine, type Answer, type Edit, type FactStore, type Seniority, type Session, type SessionStore, type SourceFiles } from "@resume-studio/tailor";
+import { createTailorEngine, type Answer, type Edit, type FactStore, type Seniority, type Session, type SessionStore } from "@resume-studio/tailor";
 import { latexAdapter } from "@resume-studio/tailor-latex";
-import { latexmkVerifier } from "@resume-studio/tailor-latex/node";
+import { latexmkVerifier, readResumeFolder, writeResumeFolder } from "@resume-studio/tailor-latex/node";
 
 export interface ToolsDeps {
   provider: ProviderConfig;
@@ -17,28 +16,6 @@ export interface ToolsDeps {
 }
 
 const WORKING = new Set<Session["status"]>(["created", "analyzing", "writing", "verifying"]);
-
-/** A resume on disk: a folder (main.tex, or the file with \documentclass) or one .tex file. */
-export function readResume(path: string): { dir: string; source: SourceFiles } {
-  const p = resolve(path);
-  if (!existsSync(p)) throw new Error(`No such file or folder: ${p}`);
-  const isFile = statSync(p).isFile();
-  const dir = isFile ? dirname(p) : p;
-  const files: Record<string, string> = {};
-  const walk = (d: string, depth: number) => {
-    for (const n of readdirSync(d)) {
-      if (n.startsWith(".") || n === "node_modules") continue;
-      const f = join(d, n);
-      const st = statSync(f);
-      if (st.isDirectory() && depth < 4) walk(f, depth + 1);
-      else if (st.isFile() && /\.(tex|cls|sty|bib)$/.test(n) && st.size < 2_000_000) files[relative(dir, f)] = readFileSync(f, "utf8");
-    }
-  };
-  walk(dir, 0);
-  const main = isFile ? basename(p) : "main.tex" in files ? "main.tex" : Object.keys(files).find((f) => f.endsWith(".tex") && /\\documentclass/.test(files[f]));
-  if (!main || !(main in files)) throw new Error(`No LaTeX resume in ${p}: point to the main .tex file or its folder.`);
-  return { dir, source: { main, files } };
-}
 
 export function createTools(deps: ToolsDeps) {
   const running = new Map<string, Promise<unknown>>();
@@ -99,7 +76,7 @@ export function createTools(deps: ToolsDeps) {
       waitSeconds?: number;
       onProgress?: (m: string) => void;
     }) {
-      const { dir, source } = readResume(args.resumePath);
+      const { dir, source } = readResumeFolder(args.resumePath);
       const s = await engine(dir).start({
         job: { company: args.company, role: args.role, seniority: args.seniority, description: args.jobDescription },
         source,
@@ -132,17 +109,7 @@ export function createTools(deps: ToolsDeps) {
       const reject = new Set(args.rejectEditIds ?? []);
       const accepted = (s.edits ?? []).filter((e) => e.status !== "dropped" && !reject.has(e.id)).map((e) => e.id);
       const { source } = await engine(s.context.resumeDir).finalize(s.id, accepted);
-      const out = resolve(args.outputDir);
-      if (out === resolve(s.context.resumeDir)) throw new Error("Choose a new folder: the original resume is never overwritten.");
-      if (existsSync(out) && readdirSync(out).length) throw new Error(`${out} already exists and isn't empty.`);
-      mkdirSync(out, { recursive: true });
-      // The original folder first (images, fonts, classes), then the tailored text files over it.
-      cpSync(s.context.resumeDir, out, { recursive: true, filter: (src) => !/\/\.(git|DS_Store)/.test(src) && !/\.(aux|log|out|fls|fdb_latexmk|synctex\.gz|xdv)$/.test(src) });
-      for (const [path, text] of Object.entries(source.files)) {
-        mkdirSync(dirname(join(out, path)), { recursive: true });
-        writeFileSync(join(out, path), text);
-      }
-      writeFileSync(join(out, "jd.md"), `# ${s.job.role} · ${s.job.company}\n\n${s.job.description.trim()}\n`);
+      const out = writeResumeFolder(s.context.resumeDir, args.outputDir, source, { "jd.md": `# ${s.job.role} · ${s.job.company}\n\n${s.job.description.trim()}\n` });
       return `Saved to ${out} with ${accepted.length} of ${(s.edits ?? []).filter((e) => e.status !== "dropped").length} changes (main file: ${source.main}; the job description is in jd.md). The original at ${s.context.resumeDir} is unchanged.`;
     },
   };

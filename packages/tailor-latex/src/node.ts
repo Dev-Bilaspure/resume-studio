@@ -2,9 +2,9 @@
 // Resume Studio: the CLI, the evaluation harness, a standalone service. Needs TeX Live (latexmk) and
 // poppler (pdfinfo, pdftotext) on PATH or in the usual macOS/Linux locations.
 import { execFile } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { basename, delimiter, dirname, join, relative, resolve } from "node:path";
 import type { BuildCheck, BuildVerifier, SourceFiles } from "@resume-studio/tailor";
 import { latexAdapter } from "./latex.ts";
 
@@ -75,4 +75,52 @@ export function latexmkVerifier(options: LatexmkOptions = {}): BuildVerifier {
     },
     editAt: (draft, err) => latexAdapter.editAt(draft, err),
   };
+}
+
+// ---- Resume folders on disk ---------------------------------------------------------------------------------
+
+/**
+ * A LaTeX resume on disk: a folder (its main.tex, or the file with \documentclass) or a single .tex file.
+ * Text files (.tex, .cls, .sty, .bib) become the engine's source; everything else stays in `dir` as assets.
+ */
+export function readResumeFolder(path: string): { dir: string; source: SourceFiles } {
+  const p = resolve(path);
+  if (!existsSync(p)) throw new Error(`No such file or folder: ${p}`);
+  const isFile = statSync(p).isFile();
+  const dir = isFile ? dirname(p) : p;
+  const files: Record<string, string> = {};
+  const walk = (d: string, depth: number) => {
+    for (const n of readdirSync(d)) {
+      if (n.startsWith(".") || n === "node_modules") continue;
+      const f = join(d, n);
+      const st = statSync(f);
+      if (st.isDirectory() && depth < 4) walk(f, depth + 1);
+      else if (st.isFile() && /\.(tex|cls|sty|bib)$/.test(n) && st.size < 2_000_000) files[relative(dir, f)] = readFileSync(f, "utf8");
+    }
+  };
+  walk(dir, 0);
+  const main = isFile ? basename(p) : "main.tex" in files ? "main.tex" : Object.keys(files).find((f) => f.endsWith(".tex") && /\\documentclass/.test(files[f]));
+  if (!main || !(main in files)) throw new Error(`No LaTeX resume in ${p}: point to the main .tex file or its folder.`);
+  return { dir, source: { main, files } };
+}
+
+/**
+ * Writes a tailored resume as a new folder: the original folder's files (images, fonts, classes) first,
+ * then the tailored text files over them, then any extra files (e.g. jd.md). Refuses to write over the
+ * original or into a folder that isn't empty.
+ */
+export function writeResumeFolder(originalDir: string, outDir: string, source: SourceFiles, extra: Record<string, string> = {}): string {
+  const out = resolve(outDir);
+  if (out === resolve(originalDir)) throw new Error("Choose a new folder: the original resume is never overwritten.");
+  if (existsSync(out) && readdirSync(out).length) throw new Error(`${out} already exists and isn't empty.`);
+  mkdirSync(out, { recursive: true });
+  cpSync(originalDir, out, {
+    recursive: true,
+    filter: (src) => src === originalDir || (!/\/\.[^/]+$/.test(src) && !/\.(aux|log|out|fls|fdb_latexmk|synctex\.gz|xdv|toc|bbl|blg|bcf|run\.xml)$/.test(src)),
+  });
+  for (const [path, text] of Object.entries({ ...source.files, ...extra })) {
+    mkdirSync(dirname(join(out, path)), { recursive: true });
+    writeFileSync(join(out, path), text);
+  }
+  return out;
 }

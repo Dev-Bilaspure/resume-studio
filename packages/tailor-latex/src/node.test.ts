@@ -35,3 +35,36 @@ test("a broken draft fails with the line of the error", { skip: !hasTex && "TeX 
   assert.equal(r.errors[0]?.line, 5);
   assert.match(r.errors[0]?.message ?? "", /Undefined control sequence/);
 });
+
+test("resume folders: read the main file, write a new folder, never over the original", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync: read, rmSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const { readResumeFolder, writeResumeFolder } = await import("./node.ts");
+  const root = mkdtempSync(join(tmpdir(), "resume-folder-"));
+  try {
+    const orig = join(root, "cv");
+    mkdirSync(join(orig, "sections"), { recursive: true });
+    writeFileSync(join(orig, "resume.tex"), "\\documentclass{article}\\begin{document}\\input{sections/exp}\\end{document}");
+    writeFileSync(join(orig, "sections/exp.tex"), "Built things.");
+    writeFileSync(join(orig, "photo.png"), "PNG");
+    writeFileSync(join(orig, "resume.aux"), "aux");
+
+    const { dir, source } = readResumeFolder(orig);
+    assert.equal(dir, orig);
+    assert.equal(source.main, "resume.tex", "found by \\documentclass when there's no main.tex");
+    assert.deepEqual(Object.keys(source.files).sort(), ["resume.tex", "sections/exp.tex"]);
+
+    const out = writeResumeFolder(orig, join(root, "tailored"), { main: "resume.tex", files: { ...source.files, "sections/exp.tex": "Built better things." } }, { "jd.md": "# Job" });
+    assert.equal(read(join(out, "sections/exp.tex"), "utf8"), "Built better things.");
+    assert.equal(read(join(out, "photo.png"), "utf8"), "PNG", "assets come along");
+    assert.ok(existsSync(join(out, "jd.md")));
+    assert.ok(!existsSync(join(out, "resume.aux")), "build leftovers don't");
+    assert.equal(read(join(orig, "sections/exp.tex"), "utf8"), "Built things.", "the original is untouched");
+
+    assert.throws(() => writeResumeFolder(orig, orig, source), /never overwritten/);
+    assert.throws(() => writeResumeFolder(orig, out, source), /isn't empty/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
