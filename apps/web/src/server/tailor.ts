@@ -1,5 +1,5 @@
 import "server-only";
-import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { LLMError, createLLM, type ProviderId } from "@resume-studio/llm";
@@ -214,6 +214,7 @@ export async function getSession(id: string): Promise<Session & { running: boole
 export async function listSessions(
   resumeId?: string,
 ): Promise<(Pick<Session, "id" | "status" | "createdAt" | "updatedAt" | "job" | "context"> & { interrupted: boolean })[]> {
+  void pruneOnce();
   const files = await readdir(SESSIONS_DIR).catch(() => [] as string[]);
   const out = [];
   for (const f of files.filter((x) => x.endsWith(".json"))) {
@@ -269,6 +270,8 @@ export async function previewSession(
   if (!pdf) return { pdf: "", pages: null, atsScore: null, errors: check.errors.map((e) => e.message) };
   const name = `preview-${Date.now()}.pdf`;
   await copyFile(pdf, join(workDir(id), name));
+  await keepNewestPdfs(workDir(id));
+  await keepNewestPdfs(workDir(`${id}-preview`));
   return { pdf: name, pages: check.pages, atsScore: check.atsScore ?? null, errors: check.errors.map((e) => e.message) };
 }
 
@@ -330,6 +333,9 @@ export async function finalizeSession(id: string, accepted: string[], name: stri
     label: slugify(`${s.job.company}-${s.job.role}`).slice(0, 50),
   }).catch(() => null);
   emit({ type: "resumes" });
+  // The build folders served the review; reopening it rebuilds what it needs.
+  await rm(workDir(id), { recursive: true, force: true });
+  await rm(workDir(`${id}-preview`), { recursive: true, force: true });
   return meta;
 }
 
@@ -343,4 +349,48 @@ export async function writeFacts(facts: { id: string; text: string; skills: stri
 
 export function factsFileExists() {
   return existsSync(FACTS_FILE);
+}
+
+// ---- Housekeeping -----------------------------------------------------------------------------------------
+
+/** Sessions untouched this long are removed, with their work folders. A saved resume keeps its own record (tailor.json). */
+const SESSION_TTL_MS = 30 * 86_400_000;
+/** Preview and draft PDFs kept per work folder; the review screen only shows the latest. */
+const KEEP_PDFS = 3;
+
+async function keepNewestPdfs(dir: string) {
+  const names = (await readdir(dir).catch(() => [] as string[])).filter((n) => /^(preview|draft)-\d+\.pdf$/.test(n));
+  const dated = await Promise.all(names.map(async (n) => ({ n, t: (await stat(join(dir, n)).catch(() => null))?.mtimeMs ?? 0 })));
+  const old = dated.sort((a, b) => b.t - a.t).slice(KEEP_PDFS);
+  await Promise.all(old.map(({ n }) => rm(join(dir, n), { force: true })));
+}
+
+/** Removes expired sessions, the work folders of finished or orphaned ones, and old PDFs. */
+export async function pruneTailorState(now = Date.now()) {
+  const ids = new Set<string>();
+  for (const f of await readdir(SESSIONS_DIR).catch(() => [] as string[])) {
+    if (!f.endsWith(".json")) continue;
+    const s = await sessionStore.get(f.replace(/\.json$/, ""));
+    if (!s || running.has(s.id)) {
+      if (s) ids.add(s.id);
+      continue;
+    }
+    if (now - Date.parse(s.updatedAt) > SESSION_TTL_MS) {
+      await rm(join(SESSIONS_DIR, f), { force: true });
+      continue;
+    }
+    ids.add(s.id);
+  }
+  const workRoot = join(TAILOR_DIR, "work");
+  for (const d of await readdir(workRoot).catch(() => [] as string[])) {
+    const owner = d.replace(/-preview$/, "");
+    if (!ids.has(owner)) await rm(join(workRoot, d), { recursive: true, force: true });
+    else await keepNewestPdfs(join(workRoot, d));
+  }
+}
+
+const gp = globalThis as unknown as { __rsTailorPruned?: Promise<void> };
+/** Once per server process, in the background. */
+function pruneOnce() {
+  return (gp.__rsTailorPruned ??= pruneTailorState().catch((e) => console.error("[tailor] prune", e)));
 }
