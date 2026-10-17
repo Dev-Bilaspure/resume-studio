@@ -81,6 +81,8 @@ export function createTailorEngine(deps: EngineDeps) {
   async function call<T>(s: Session, step: string, req: Parameters<LLM["generate"]>[0] & { schema: import("zod").ZodType<T> }, signal?: AbortSignal) {
     event(s, { type: "step", step, message: stepLabel(step) });
     const res = await deps.llm.generate<T>({ ...req, step, signal });
+    // What actually answered ("claude-opus-5-5" for "opus"): the record shows the real model.
+    s.provenance.model = res.model;
     const u = (s.usage.byStep[step] ??= { calls: 0, inputTokens: 0, outputTokens: 0, ms: 0 });
     u.calls++;
     u.inputTokens += res.usage.inputTokens;

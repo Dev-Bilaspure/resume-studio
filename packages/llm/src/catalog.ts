@@ -149,5 +149,5 @@ export async function testConnection(config: ProviderConfig, signal?: AbortSigna
     step: "test-connection",
   });
   if (!res.data.ok) throw new LLMError("invalid_output", "The model answered, but not as instructed", false, config.provider);
-  return { ok: true, latencyMs: res.durationMs, model: config.model };
+  return { ok: true, latencyMs: res.durationMs, model: res.model };
 }

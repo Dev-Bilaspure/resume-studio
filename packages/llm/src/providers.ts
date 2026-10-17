@@ -5,6 +5,22 @@ import { APICallError, NoObjectGeneratedError, NoOutputGeneratedError, Output, g
 import { createClaudeCode, isAuthenticationError, isTimeoutError } from "ai-sdk-provider-claude-code";
 import { LLMError, type GenerateRequest, type GenerateResult, type LLM, type ProviderConfig, type ProviderId } from "./types.ts";
 
+/** Claude Code's model aliases, or a full model id. */
+const CLAUDE_CODE_MODEL = /^(opus|sonnet|haiku|fable|claude-[a-z0-9.-]+)(\[1m\])?$/;
+
+/**
+ * The model that actually answered, from Claude Code's per-model usage. It also runs a small model
+ * (Haiku) for its own housekeeping; the answer comes from the other one, unless Haiku was asked for.
+ */
+function claudeCodeModel(metadata: unknown, requested: string): string | undefined {
+  const usage = (metadata as { "claude-code"?: { modelUsage?: Record<string, { outputTokens?: number }> } } | undefined)?.["claude-code"]?.modelUsage;
+  if (!usage) return undefined;
+  const models = Object.keys(usage);
+  const main = models.filter((m) => !/haiku/.test(m));
+  if (/haiku/.test(requested) || !main.length) return models.find((m) => /haiku/.test(m)) ?? models[0];
+  return main.sort((a, b) => (usage[b].outputTokens ?? 0) - (usage[a].outputTokens ?? 0))[0];
+}
+
 /** The AI SDK model object for a provider configuration. Credentials come from the config only. */
 export function languageModel(config: ProviderConfig): LanguageModel {
   switch (config.provider) {
@@ -28,6 +44,9 @@ export function languageModel(config: ProviderConfig): LanguageModel {
       return createVertex({ project: v.project, location: v.location, ...(credentials ? { googleAuthOptions: { credentials } } : {}) })(config.model);
     }
     case "claude-code":
+      // Claude Code runs an unknown model name on its default model without saying so: refuse it here.
+      if (!CLAUDE_CODE_MODEL.test(config.model))
+        throw new LLMError("unavailable", `"${config.model}" isn't a Claude Code model. Use opus, sonnet, haiku, fable or a full claude-… model id.`, false, "claude-code");
       // The local Claude Code login (Pro/Max subscription). Isolated from your own Claude Code setup:
       // no tools, no CLAUDE.md/settings/hooks/plugins, and it can't touch files.
       return createClaudeCode({
@@ -99,6 +118,13 @@ export function createLLM(config: ProviderConfig): LLM {
           abortSignal: signal,
         });
         const data = result.output as T;
+        let actual = result.response.modelId || config.model;
+        if (config.provider === "claude-code") {
+          actual = claudeCodeModel(result.providerMetadata, config.model) ?? config.model;
+          // A full id (not an alias) that ran as something else was swapped for the default: say so.
+          if (config.model.startsWith("claude-") && !actual.startsWith(config.model.replace(/\[1m\]$/, "")))
+            throw new LLMError("unavailable", `Claude Code ran ${actual} instead of ${config.model}. Check the model id.`, false, config.provider);
+        }
         return {
           data,
           usage: {
@@ -107,7 +133,7 @@ export function createLLM(config: ProviderConfig): LLM {
             totalTokens: result.usage.totalTokens ?? (result.usage.inputTokens ?? 0) + (result.usage.outputTokens ?? 0),
           },
           provider: config.provider,
-          model: config.model,
+          model: actual,
           durationMs: Date.now() - started,
         };
       } catch (e) {

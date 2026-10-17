@@ -55,6 +55,7 @@ export interface GenerateResult<T> {
   data: T;
   usage: Usage;
   provider: ProviderId;
+  /** The model that actually answered, as the provider reports it (e.g. "claude-opus-5-5" for "opus"). */
   model: string;
   durationMs: number;
 }
