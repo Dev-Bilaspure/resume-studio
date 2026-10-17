@@ -10,6 +10,7 @@ import {
   FileWarning,
   GitCompare,
   Keyboard,
+  Pencil,
   Loader2,
   Plus,
   RotateCcw,
@@ -41,7 +42,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api, type ResumeSummary } from "@/lib/api";
 import { formatDuration, relativeTime } from "@/lib/format";
-import { ENGINES, type BuildResult, type SnapshotInfo } from "@/lib/types";
+import { ENGINES, type BuildResult, type ResumeMeta, type SnapshotInfo } from "@/lib/types";
 import { useConnected } from "@/lib/use-events";
 import { cn } from "@/lib/utils";
 import { useLayout } from "@/lib/use-layout";
@@ -171,15 +172,90 @@ function ShortcutsHelp() {
   );
 }
 
-function ResumeSwitcher({ currentId, name }: { currentId: string; name: string }) {
+/** The resume's name: click to rename it in place (Enter or clicking away saves, Escape cancels). */
+function ResumeName({
+  id,
+  name,
+  editing,
+  onEditing,
+  onRenamed,
+}: {
+  id: string;
+  name: string;
+  editing: boolean;
+  onEditing(v: boolean): void;
+  onRenamed(meta: ResumeMeta): void;
+}) {
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const save = async (next: string) => {
+    onEditing(false);
+    if (!next || next === name) return;
+    setSaving(next);
+    try {
+      onRenamed(await api.update(id, { name: next }));
+    } catch (e) {
+      toast.error("Couldn't rename the resume", { description: (e as Error).message });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  if (editing) return <RenameInput name={name} onDone={(next) => void (next === null ? onEditing(false) : save(next))} />;
+  return (
+    <button
+      type="button"
+      onClick={() => onEditing(true)}
+      title="Rename"
+      className="max-w-72 truncate rounded-md px-2 py-1 text-sm font-medium hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+    >
+      {saving !== null ? <span className="text-muted-foreground">{saving}</span> : name}
+    </button>
+  );
+}
+
+/** Mounted for each edit, so it starts from the current name. `onDone(null)` cancels. */
+function RenameInput({ name, onDone }: { name: string; onDone(next: string | null): void }) {
+  const [draft, setDraft] = useState(name);
+  const input = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+  // Selected, so typing replaces the name and the arrow keys keep it.
+  useEffect(() => input.current?.select(), []);
+  const finish = (save: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    onDone(save ? draft.trim() : null);
+  };
+  return (
+    <input
+      ref={input}
+      autoFocus
+      value={draft}
+      maxLength={120}
+      aria-label="Resume name"
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => finish(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") finish(true);
+        if (e.key === "Escape") finish(false);
+      }}
+      // As wide as the name being typed, within limits.
+      style={{ width: `${Math.min(Math.max(draft.length, 8), 40) + 2}ch` }}
+      className="h-7 rounded-md border border-ring bg-background px-2 text-sm font-medium ring-3 ring-ring/30 outline-none"
+    />
+  );
+}
+
+function ResumeSwitcher({ currentId, name, onRenamed }: { currentId: string; name: string; onRenamed(meta: ResumeMeta): void }) {
   const router = useRouter();
   const [list, setList] = useState<ResumeSummary[]>([]);
   const [creating, setCreating] = useState<null | "new" | "duplicate">(null);
+  const [renaming, setRenaming] = useState(false);
   return (
     <>
+      <ResumeName id={currentId} name={name} editing={renaming} onEditing={setRenaming} onRenamed={onRenamed} />
       <DropdownMenu onOpenChange={(o) => o && void api.list().then((d) => setList(d.resumes))}>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="max-w-72 gap-1 px-2 font-medium" />}>
-          <span className="truncate">{name}</span>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-xs" className="-ml-1.5" aria-label="Switch resume" title="Switch resume" />}>
           <ChevronDown className="opacity-60" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-72">
@@ -197,6 +273,10 @@ function ResumeSwitcher({ currentId, name }: { currentId: string; name: string }
             ))}
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setRenaming(true)}>
+            <Pencil />
+            Rename…
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setCreating("duplicate")}>
             <GitCompare />
             Duplicate this resume…
@@ -392,7 +472,7 @@ export function WorkspaceView({ id }: { id: string }) {
           <span className="hidden lg:inline">Resume Studio</span>
         </Link>
         <span className="text-muted-foreground/50">/</span>
-        <ResumeSwitcher currentId={id} name={meta.name} />
+        <ResumeSwitcher currentId={id} name={meta.name} onRenamed={ws.setMeta} />
         {meta.application && (
           <Link
             href={`/tailor/${meta.application.session}`}
