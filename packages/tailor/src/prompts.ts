@@ -4,7 +4,7 @@
 import { z } from "zod";
 import type { Answer, Edit, Fact, JobInput, JobProfile, Question, RequirementMatch, ResumeDoc, TailorOptions } from "./types.ts";
 
-export const PROMPTS_VERSION = "2026-10-17.1";
+export const PROMPTS_VERSION = "2026-10-17.2";
 
 // ---- Shared: how the resume and facts are shown to the model ----------------------------------------------
 
@@ -261,7 +261,7 @@ ${DATA_NOTE}`,
 
 export function repairPrompt(args: { doc: ResumeDoc; facts: Fact[]; problems: { edit: Edit; issues: string[] }[] }) {
   return {
-    system: `You are fixing resume edits that failed review. For each, return a corrected edit for the same target that keeps the intent but only says what the evidence supports, or omit it if it can't be saved. Same edit rules as before: light markup only (**bold**, *italic*), cite evidence, no invented numbers, technologies or scope.
+    system: `You are fixing resume edits that failed review. For each, return a corrected edit for the same target that keeps the intent but only says what the evidence supports, or omit it if it can't be saved. Its reason must describe the corrected edit, not the rejected one (don't mention a claim you removed as if it were still there). Same edit rules as before: light markup only (**bold**, *italic*), cite evidence, no invented numbers, technologies or scope.
 
 ${TRUTH_RULES}
 ${DATA_NOTE}`,

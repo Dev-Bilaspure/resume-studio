@@ -200,8 +200,9 @@ export function createTailorEngine(deps: EngineDeps) {
       for (const e of rejudged.passed) {
         const original = byTarget.get(e.change.target)!;
         byTarget.delete(e.change.target);
-        // The fix replaces the original; the note says what was wrong with the first version.
-        passed.push({ ...e, reason: original.edit.reason || e.reason, issues: [`Revised after the fact-check: ${original.issues.join("; ")}`, ...(e.issues ?? [])] });
+        // The fix replaces the original, with its own reason (the original's may describe what was cut,
+        // like a skill the evidence didn't support); the note says what was wrong with the first version.
+        passed.push({ ...e, reason: e.reason || original.edit.reason, issues: [`Revised after the fact-check: ${original.issues.join("; ")}`, ...(e.issues ?? [])] });
       }
       for (const f of byTarget.values()) dropped.push({ ...f.edit, status: "dropped", issues: f.issues });
     }

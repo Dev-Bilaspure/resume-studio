@@ -80,7 +80,7 @@ test("every proposed edit is accounted for: kept, repaired or shown as dropped",
     requirement_matches: () => ({ matches: [{ requirementId: "r1", status: "missing", evidence: [], note: "n" }], questions: [] }),
     resume_edits: (req) =>
       String(req.system).includes("fixing resume edits")
-        ? { strategy: "fixed", edits: [edit("rewrite_bullet", "b2", "Cut failures **60%** with **Temporal** workflows.")] }
+        ? { strategy: "fixed", edits: [{ ...edit("rewrite_bullet", "b2", "Cut failures **60%** with **Temporal** workflows."), reason: "Names the workflow engine." }] }
         : {
             strategy: "s",
             edits: [
@@ -107,6 +107,7 @@ test("every proposed edit is accounted for: kept, repaired or shown as dropped",
   assert.match(byTarget["rewrite_bullet:b2:ok"].issues!.join(), /Revised after the fact-check: “Led a platform team”/);
   assert.match(byTarget["rewrite_bullet:b1:dropped"].issues!.join(), /10M/);
   assert.equal((byTarget["rewrite_bullet:b2:ok"].change as { text: string }).text, "Cut failures **60%** with **Temporal** workflows.");
+  assert.equal(byTarget["rewrite_bullet:b2:ok"].reason, "Names the workflow engine.", "a repaired edit explains itself, not the version it replaced");
   // Ids are unique, and only kept edits reach the document.
   const ids = s.edits!.map((e) => e.id);
   assert.equal(new Set(ids).size, ids.length);
