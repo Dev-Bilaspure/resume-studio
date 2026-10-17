@@ -55,6 +55,8 @@ export function languageModel(config: ProviderConfig): LanguageModel {
           settingSources: [],
           permissionMode: "default",
           maxTurns: 4,
+          // Each call is its own conversation: nothing is saved to your Claude Code session history.
+          persistSession: false,
           logger: false, // its internal warnings aren't actionable for callers
           ...(config.claudeCodePath ? { pathToClaudeCodeExecutable: config.claudeCodePath } : {}),
         },
@@ -104,7 +106,12 @@ export function toLLMError(e: unknown, provider: ProviderId): LLMError {
 }
 
 export function createLLM(config: ProviderConfig): LLM {
-  const model = languageModel(config);
+  // Validates the config now (unknown model, missing key) rather than on the first call.
+  const shared = languageModel(config);
+  // Claude Code's model object remembers its last session and resumes it on the next call, so calls
+  // through one object would share a conversation (a fact-check that remembers writing the edits; one
+  // evaluation case that sees the last). A fresh object per call keeps every call independent.
+  const modelFor = () => (config.provider === "claude-code" ? languageModel(config) : shared);
   return {
     provider: config.provider,
     model: config.model,
@@ -114,7 +121,7 @@ export function createLLM(config: ProviderConfig): LLM {
       const signal = req.signal ? AbortSignal.any([req.signal, timeout]) : timeout;
       try {
         const result = await generateText({
-          model,
+          model: modelFor(),
           system: req.system,
           ...(typeof req.prompt === "string" ? { prompt: req.prompt } : { messages: req.prompt }),
           output: Output.object({ schema: req.schema, name: req.schemaName, description: req.schemaDescription }),
