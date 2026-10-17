@@ -1,0 +1,9 @@
+**/node_modules
+**/.next
+**/.turbo
+apps
+resumes
+.resume-studio
+eval-data
+eval-results
+.git
