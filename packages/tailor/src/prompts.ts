@@ -4,7 +4,7 @@
 import { z } from "zod";
 import type { Answer, Edit, Fact, JobInput, JobProfile, Question, RequirementMatch, ResumeDoc, TailorOptions } from "./types.ts";
 
-export const PROMPTS_VERSION = "2026-10-16.1";
+export const PROMPTS_VERSION = "2026-10-17.1";
 
 // ---- Shared: how the resume and facts are shown to the model ----------------------------------------------
 
@@ -198,6 +198,7 @@ const WRITING_RULES = `What gets a software engineer shortlisted, and how to wri
 const TRUTH_RULES = `Truthfulness (non-negotiable):
 - Every technology, number, scope, team size, title and outcome in new text must come from the cited evidence: the original bullet, another bullet, a skills line or a fact. Cite all of them.
 - You may rephrase, reframe toward the job's language, combine details from bullets of the same role, and drop details. You may not invent, inflate ("led" for "contributed"), or move a claim to a different role.
+- Keep every result with the work that produced it. A number or outcome stays attached to the action the evidence credits it to; never hand it to a tool, a side detail or another piece of work ("cut failures 60% by designing the pipeline" must not become "cut failures 60% by containerizing it").
 - Never change dates, employers, past job titles, degrees, schools or contact details.
 - A skill the candidate doesn't have stays out, even if the job requires it.`;
 
@@ -248,7 +249,7 @@ export const JudgeSchema = z.object({
 
 export function judgePrompt(items: { id: string; before: string; after: string; evidence: string[] }[]) {
   return {
-    system: `You are a meticulous fact-checker for resumes. For each edit, compare the new text with its evidence (the original text and cited sources). A claim is unsupported if the evidence doesn't state it: a technology, number, scope, team size, ownership level ("led", "owned", "architected") or outcome that isn't there. Rephrasing, reordering and using a job's terminology for the same thing are fine. Be strict about substance and relaxed about wording.
+    system: `You are a meticulous fact-checker for resumes. For each edit, compare the new text with its evidence (the original text and cited sources). A claim is unsupported if the evidence doesn't state it: a technology, number, scope, team size, ownership level ("led", "owned", "architected") or outcome that isn't there. It is also unsupported when a real number or outcome is credited to different work than in the evidence (the evidence credits a 60% gain to the pipeline's design; the edit credits it to running it on Kubernetes). Rephrasing, reordering and using a job's terminology for the same thing are fine. Be strict about substance and relaxed about wording.
 ${DATA_NOTE}`,
     prompt: items
       .map((i) => `<edit id="${i.id}">\nBEFORE: ${i.before || "(new)"}\nAFTER: ${i.after}\nEVIDENCE:\n${i.evidence.map((e) => `- ${e}`).join("\n") || "- (none cited)"}\n</edit>`)
