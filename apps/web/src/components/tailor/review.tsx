@@ -35,6 +35,8 @@ export function Review({ session }: { session: SessionView }) {
   const [accepted, setAccepted] = useState<Set<string>>(() => new Set(usable.map((e) => e.id)));
   const [tab, setTab] = useState<Tab>("changes");
   const [view, setView] = useState<"tailored" | "original">("tailored");
+  // Narrow windows show one pane at a time.
+  const [pane, setPane] = useState<"changes" | "pdf">("changes");
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [originalPdf, setOriginalPdf] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export function Review({ session }: { session: SessionView }) {
 
   return (
     <div className="grid h-full grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,46%)]">
-      <div className="flex min-h-0 flex-col border-r">
+      <div className={cn("min-h-0 flex-col border-r lg:flex", pane === "pdf" ? "hidden" : "flex")}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-5 px-6 py-6">
             {report && <Scoreboard session={session} preview={preview} />}
@@ -208,6 +210,9 @@ export function Review({ session }: { session: SessionView }) {
           <span className="text-xs text-muted-foreground tabular-nums">
             {accepted.size} of {usable.length} change{usable.length === 1 ? "" : "s"} accepted
           </span>
+          <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setPane("pdf")}>
+            Preview PDF
+          </Button>
           <Input className="ml-auto h-8 w-72 max-w-full" value={name} onChange={(e) => setName(e.target.value)} aria-label="Name of the new resume" />
           <Button disabled={saving || !name.trim()} onClick={() => void save()}>
             {saving ? <Loader2 className="animate-spin" /> : <Save />}
@@ -217,12 +222,15 @@ export function Review({ session }: { session: SessionView }) {
       </div>
 
       <FactsDialog open={factsOpen} onOpenChange={setFactsOpen} />
-      <div className="hidden min-h-0 flex-col lg:flex">
+      <div className={cn("min-h-0 flex-col lg:flex", pane === "pdf" ? "flex" : "hidden")}>
         <PdfPreview
           url={pdfUrl}
           className="min-h-0 flex-1"
           toolbarExtra={
             <span className="flex items-center gap-2">
+              <Button variant="outline" size="xs" className="lg:hidden" onClick={() => setPane("changes")}>
+                Changes
+              </Button>
               {view === "tailored" && previewing && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label="Updating the preview" />}
               {view === "tailored" && preview?.errors.length ? (
                 <span className="flex items-center gap-1 text-[11px] text-destructive" title={preview.errors.join("\n")}>
