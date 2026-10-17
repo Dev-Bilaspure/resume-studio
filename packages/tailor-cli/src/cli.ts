@@ -68,8 +68,17 @@ if (opt.level && !LEVELS.includes(opt.level)) usage(`--level must be one of ${LE
 
 // ---- Setup ---------------------------------------------------------------------------------------------------
 
-const { dir, source } = readResumeFolder(resumePath);
-const description = (opt.jd === "-" ? readFileSync(0, "utf8") : readFileSync(opt.jd, "utf8")).trim();
+function attempt<T>(what: string, f: () => T): T {
+  try {
+    return f();
+  } catch (e) {
+    const err = e as NodeJS.ErrnoException;
+    usage(err.code === "ENOENT" ? `${what}: no such file: ${err.path}` : `${what}: ${err.message}`);
+  }
+}
+const { dir, source } = attempt("Resume", () => readResumeFolder(resumePath));
+const description = attempt("Job posting", () => (opt.jd === "-" ? readFileSync(0, "utf8") : readFileSync(opt.jd!, "utf8")).trim());
+if (description.length < 80) usage("The job posting looks incomplete: paste the whole posting into the --jd file.");
 const providers = providersFromEnv(process.env, { claudeCode: true });
 const chosen = providers.find((p) => p.provider === ((opt.provider ?? process.env.TAILOR_PROVIDER) as ProviderId)) ?? (opt.provider ? undefined : providers[0]);
 if (!chosen) usage(`No credentials for ${opt.provider}. Set its API key in the environment (see --help).`);
