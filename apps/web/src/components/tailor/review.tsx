@@ -3,7 +3,7 @@
 import type { Edit, EvidenceRef, Fact, Requirement } from "@resume-studio/tailor";
 import { ArrowRight, BookmarkCheck, ChevronDown, CircleAlert, Info, Loader2, Save, TriangleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { PdfPreview } from "@/components/preview/pdf-preview";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ export function Review({ session }: { session: SessionView }) {
   const [view, setView] = useState<"tailored" | "original">("tailored");
   // Narrow windows show one pane at a time.
   const [pane, setPane] = useState<"changes" | "pdf">("changes");
+  const wide = useMediaQuery("(min-width: 1024px)");
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [originalPdf, setOriginalPdf] = useState<string | null>(null);
@@ -225,35 +226,40 @@ export function Review({ session }: { session: SessionView }) {
 
       <FactsDialog open={factsOpen} onOpenChange={setFactsOpen} />
       <div className={cn("min-h-0 flex-col lg:flex", pane === "pdf" ? "flex" : "hidden")}>
-        <PdfPreview
-          url={pdfUrl}
-          className="min-h-0 flex-1"
-          toolbarExtra={
-            <span className="flex items-center gap-2">
-              <Button variant="outline" size="xs" className="lg:hidden" onClick={() => setPane("changes")}>
-                Changes
-              </Button>
-              {view === "tailored" && previewing && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label="Updating the preview" />}
-              {view === "tailored" && preview?.errors.length ? (
-                <span className="flex items-center gap-1 text-[11px] text-destructive" title={preview.errors.join("\n")}>
-                  <CircleAlert className="size-3" /> Build errors
+        {(wide || pane === "pdf") && (
+          <PdfPreview
+            url={pdfUrl}
+            className="min-h-0 flex-1"
+            toolbarExtra={
+              <span className="flex items-center gap-2">
+                <Button variant="outline" size="xs" className="lg:hidden" onClick={() => setPane("changes")}>
+                  Changes
+                </Button>
+                {view === "tailored" && previewing && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label="Updating the preview" />}
+                {view === "tailored" && preview?.errors.length ? (
+                  <span className="flex items-center gap-1 text-[11px] text-destructive" title={preview.errors.join("\n")}>
+                    <CircleAlert className="size-3" /> Build errors
+                  </span>
+                ) : null}
+                <span className="flex rounded-md bg-muted p-0.5 text-[11px]">
+                  {(["tailored", "original"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setView(v)}
+                      className={cn(
+                        "rounded px-2 py-0.5 font-medium text-muted-foreground capitalize",
+                        view === v && "bg-background text-foreground shadow-sm",
+                      )}
+                    >
+                      {v}
+                    </button>
+                  ))}
                 </span>
-              ) : null}
-              <span className="flex rounded-md bg-muted p-0.5 text-[11px]">
-                {(["tailored", "original"] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setView(v)}
-                    className={cn("rounded px-2 py-0.5 font-medium text-muted-foreground capitalize", view === v && "bg-background text-foreground shadow-sm")}
-                  >
-                    {v}
-                  </button>
-                ))}
               </span>
-            </span>
-          }
-        />
+            }
+          />
+        )}
       </div>
     </div>
   );
@@ -309,10 +315,11 @@ function Scoreboard({ session, preview }: { session: SessionView; preview: Previ
 }
 
 function Warnings({ session }: { session: SessionView }) {
-  const deal = session.profile?.dealBreakers ?? [];
-  // The engine also lists each deal-breaker as a "Check: …" warning (for clients that don't show them);
-  // they're shown above already.
-  const warnings = (session.report?.warnings ?? []).filter((w) => !deal.some((d) => w === `Check: ${d.text}`));
+  // The engine lists a hard requirement as a "Check: …" warning only when the resume doesn't already meet
+  // it (a degree you have isn't a concern): show those, once, as hard requirements.
+  const all = session.report?.warnings ?? [];
+  const deal = (session.profile?.dealBreakers ?? []).filter((d) => all.includes(`Check: ${d.text}`));
+  const warnings = all.filter((w) => !w.startsWith("Check: "));
   if (!deal.length && !warnings.length) return null;
   return (
     <section className="space-y-2">
@@ -590,5 +597,18 @@ function Keywords({ session }: { session: SessionView }) {
         <span className="text-foreground">Requirements</span>.
       </p>
     </div>
+  );
+}
+
+/** Whether a media query matches, kept up to date (false on the server). */
+function useMediaQuery(query: string): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const m = window.matchMedia(query);
+      m.addEventListener("change", cb);
+      return () => m.removeEventListener("change", cb);
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
   );
 }
