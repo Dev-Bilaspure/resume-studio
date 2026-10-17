@@ -30,10 +30,14 @@ These are fine and must NOT be listed: rewording; reordering; shortening or remo
 Severity: high = a recruiter or interviewer would call it false; medium = a stretch the candidate would have to walk back; low = slightly loose wording.
 Quote the tailored text exactly. If nothing is unsupported, return an empty list. Be strict but not pedantic.`;
 
-export async function auditTruthfulness(llm: LLM, original: string, tailored: string, signal?: AbortSignal): Promise<Audit> {
+export async function auditTruthfulness(llm: LLM, original: string, tailored: string, signal?: AbortSignal, confirmed: string[] = []): Promise<Audit> {
+  // What the candidate confirmed in answers is a source too, exactly as worded, and no more.
+  const answers = confirmed.length
+    ? `\n\nThe candidate also CONFIRMED these (as true as the original; nothing beyond their wording):\n${confirmed.map((c) => `- ${c}`).join("\n")}`
+    : "";
   const res = await llm.generate({
     system: AUDIT_SYSTEM,
-    prompt: `ORIGINAL resume:\n"""\n${original.trim()}\n"""\n\nTAILORED resume:\n"""\n${tailored.trim()}\n"""`,
+    prompt: `ORIGINAL resume:\n"""\n${original.trim()}\n"""${answers}\n\nTAILORED resume:\n"""\n${tailored.trim()}\n"""`,
     schema: AuditSchema,
     schemaName: "truthfulness_audit",
     temperature: 0,
@@ -69,4 +73,31 @@ export async function screenOne(llm: LLM, posting: { company: string; role: stri
     step: "eval-screen",
   });
   return res.data;
+}
+
+// ---- Simulated candidate ------------------------------------------------------------------------------------
+
+export const CandidateSchema = z.object({
+  answers: z.array(
+    z.object({
+      questionId: z.string(),
+      answer: z.string().nullable().describe("In the candidate's voice, one or two sentences, only what the history states; null if it doesn't cover this"),
+    }),
+  ),
+});
+
+const CANDIDATE_SYSTEM = `You play a job candidate answering questions about your experience. Your complete, true history is below; it is everything you have done. Answer each question in the first person, in one or two plain sentences, using only what the history states. Add nothing: no numbers, tools, scope or outcomes it doesn't give. If the history doesn't cover a question, or says you haven't done it, answer null. Being honest matters more than getting the job.`;
+
+/** Answers the engine's questions as the candidate would, from their history alone. */
+export async function answerAsCandidate(llm: LLM, history: string, questions: { id: string; question: string; topic: string }[], signal?: AbortSignal) {
+  const res = await llm.generate({
+    system: CANDIDATE_SYSTEM,
+    prompt: `YOUR HISTORY:\n"""\n${history.trim()}\n"""\n\nQUESTIONS:\n${questions.map((q) => `[${q.id}] (${q.topic}) ${q.question}`).join("\n")}`,
+    schema: CandidateSchema,
+    schemaName: "candidate_answers",
+    temperature: 0,
+    signal,
+    step: "eval-candidate",
+  });
+  return res.data.answers;
 }

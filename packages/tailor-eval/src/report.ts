@@ -18,6 +18,10 @@ export interface Summary {
   meanShownBefore: number | null;
   meanShownAfter: number | null;
   audit: { audited: number; clean: number; high: number; medium: number; low: number; byKind: Record<string, number> };
+  /** Gap questions asked, answered from the candidate's history, and facts learned. */
+  questionsAsked: number;
+  questionsAnswered: number;
+  factsLearned: number;
   pagesKept: number;
   meanSeconds: number | null;
   meanCalls: number | null;
@@ -53,6 +57,9 @@ export function summarize(results: CaseResult[]): Summary {
       low: issues.filter((i) => i.severity === "low").length,
       byKind,
     },
+    questionsAsked: ready.reduce((n, r) => n + (r.questions?.length ?? 0), 0),
+    questionsAnswered: ready.reduce((n, r) => n + (r.questions?.filter((q) => q.answer).length ?? 0), 0),
+    factsLearned: ready.reduce((n, r) => n + (r.learned?.length ?? 0), 0),
     pagesKept: ready.filter((r) => r.engine.pagesAfter !== null && r.engine.pagesAfter === r.engine.pagesBefore).length,
     meanSeconds: mean(ready.map((r) => r.engine.seconds)),
     meanCalls: mean(ready.map((r) => r.engine.calls)),
@@ -85,6 +92,7 @@ export function markdownReport(results: CaseResult[], meta: { engine: string; ju
     `| Must-haves the recruiter saw (mean) | ${fix(s.meanShownBefore)} → ${fix(s.meanShownAfter)} |`,
     `| Truthfulness: no high/medium issue | ${s.audit.clean} of ${s.audit.audited} (${pct(s.audit.clean, s.audit.audited)}) |`,
     `| Truthfulness issues (high / medium / low) | ${s.audit.high} / ${s.audit.medium} / ${s.audit.low} |`,
+    ...(s.questionsAsked ? [`| Gap questions: asked / answered from the candidate's history / facts learned | ${s.questionsAsked} / ${s.questionsAnswered} / ${s.factsLearned} |`] : []),
     `| Page count kept | ${s.pagesKept} of ${s.ready} |`,
     `| Mean time / model calls per case | ${fix(s.meanSeconds, 0)} s / ${fix(s.meanCalls)} |`,
     ``,
@@ -107,6 +115,15 @@ export function markdownReport(results: CaseResult[], meta: { engine: string; ju
   if (flips.length) {
     lines.push(``, `## Decisions that changed`, ``);
     for (const r of flips) lines.push(`- **${r.id}** (${r.screen!.tailored.advance ? "gained" : "lost"}): original: ${r.screen!.original.reason} Tailored: ${r.screen!.tailored.reason}`);
+  }
+  const asked = results.filter((r) => r.questions?.length);
+  if (asked.length) {
+    lines.push(``, `## Gap questions and the candidate's answers`, ``);
+    for (const r of asked) {
+      lines.push(`**${r.id}**`, ``);
+      for (const q of r.questions!) lines.push(`- ${q.question} → ${q.answer ?? "_I haven't done this._"}`);
+      lines.push(``);
+    }
   }
   const flagged = results.flatMap((r) => (r.audit?.issues ?? []).filter((i) => i.severity !== "low").map((i) => ({ r, i })));
   if (flagged.length) {

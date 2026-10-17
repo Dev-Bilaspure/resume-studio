@@ -33,6 +33,11 @@ url: https://…
 The posting's text: the role, responsibilities, requirements, nice-to-haves.
 ```
 
+A resume can have a `history.md` beside it: the candidate's full, true history, including what the
+resume leaves out and what they haven't done. With `--questions`, the engine asks its gap questions and a
+simulated candidate answers them from that history only (or says they haven't done it); the audit then
+accepts those answers as sources, exactly as worded, and still flags anything claimed beyond them.
+
 `eval-data/` and `eval-results/` are git-ignored: postings are other companies' text and resumes are
 personal.
 

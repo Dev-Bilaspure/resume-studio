@@ -4,7 +4,7 @@ import { createTailorEngine, jobCompany, jobTitle, memoryFactStore, memorySessio
 import { latexAdapter } from "@resume-studio/tailor-latex";
 import { latexmkVerifier } from "@resume-studio/tailor-latex/node";
 import { jobInput, type Case } from "./data.ts";
-import { auditTruthfulness, screenOne, type Audit, type Screen } from "./judges.ts";
+import { answerAsCandidate, auditTruthfulness, screenOne, type Audit, type Screen } from "./judges.ts";
 
 export interface CaseResult {
   id: string;
@@ -35,6 +35,10 @@ export interface CaseResult {
     strongAfter: number;
     requirements: number;
   };
+  /** The engine's gap questions and the simulated candidate's answers (null: "I haven't done this"). */
+  questions?: { id: string; topic: string; question: string; answer: string | null }[];
+  /** Facts the engine learned from those answers. */
+  learned?: string[];
   /** What the engine did, kept so a result can be explained: its plan, every edit, and both texts. */
   strategy?: string;
   edits?: { id: string; op: string; target: string; before: string | null; after: string | null; reason: string; status?: string; issues?: string[] }[];
@@ -51,6 +55,8 @@ export interface RunDeps {
   judgeLLM: LLM;
   signal?: AbortSignal;
   onStep?(message: string): void;
+  /** Let the engine ask its gap questions, answered by a simulated candidate from the resume's history.md. */
+  questions?: boolean;
 }
 
 /** True when the run should stop (a usage limit), as opposed to a failure of this one case. */
@@ -66,8 +72,19 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
     facts: memoryFactStore(),
     onEvent: (_id, e) => e.type === "step" && deps.onStep?.(e.message),
   });
-  let s = await engine.start({ job: jobInput(c.posting), source: c.resume.source, options: { askQuestions: false } });
+  const ask = !!deps.questions && !!c.resume.history;
+  let s = await engine.start({ job: jobInput(c.posting), source: c.resume.source, options: { askQuestions: ask } });
   s = await engine.run(s.id, deps.signal);
+  let asked: CaseResult["questions"];
+  if (s.status === "needs_input") {
+    const qs = s.questions ?? [];
+    deps.onStep?.(`The candidate answers ${qs.length} question${qs.length === 1 ? "" : "s"}`);
+    const given = await answerAsCandidate(deps.judgeLLM, c.resume.history!, qs, deps.signal);
+    const byId = new Map(given.map((a) => [a.questionId, a.answer?.trim() || null]));
+    asked = qs.map((q) => ({ id: q.id, topic: q.topic, question: q.question, answer: byId.get(q.id) ?? null }));
+    await engine.answer(s.id, asked.map((q) => (q.answer ? { questionId: q.id, text: q.answer } : { questionId: q.id, none: true })));
+    s = await engine.run(s.id, deps.signal);
+  }
   // A stop (usage limit) mid-case: surface it so the whole run pauses instead of recording a failure.
   if (s.status === "failed" && s.error?.kind && ["rate_limit", "auth", "aborted"].includes(s.error.kind)) {
     throw new LLMError(s.error.kind as "rate_limit", s.error.message, false, deps.engineLLM.provider);
@@ -110,6 +127,8 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
 
   const before = r?.before.build?.text;
   const after = r?.after.build?.text;
+  result.questions = asked;
+  result.learned = s.newFacts.map((f) => f.text);
   result.strategy = s.strategy;
   result.edits = edits.map((e) => ({
     id: e.id,
@@ -124,7 +143,9 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
   if (before && after) result.texts = { original: before, tailored: after };
   if (s.status === "ready" && before && after) {
     deps.onStep?.("Auditing truthfulness");
-    result.audit = await auditTruthfulness(deps.judgeLLM, before, after, deps.signal);
+    // The candidate's own answers are legitimate sources, exactly as they said them.
+    const confirmed = (asked ?? []).filter((q) => q.answer).map((q) => q.answer!);
+    result.audit = await auditTruthfulness(deps.judgeLLM, before, after, deps.signal, confirmed);
     deps.onStep?.("Recruiter screen: original");
     const original = await screenOne(deps.judgeLLM, c.posting, before, deps.signal);
     deps.onStep?.("Recruiter screen: tailored");

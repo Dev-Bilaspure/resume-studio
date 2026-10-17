@@ -22,6 +22,11 @@ export interface Resume {
   id: string;
   dir: string;
   source: SourceFiles;
+  /**
+   * The candidate's full, true history (history.md next to the resume): what the resume leaves out, and
+   * what they haven't done. A simulated candidate answers the engine's questions from it, and only it.
+   */
+  history?: string;
 }
 
 export interface Case {
@@ -79,7 +84,8 @@ export function loadResumes(dataDir: string): Resume[] {
       };
       walk(dir);
       if (!files["main.tex"]) throw new Error(`resumes/${id}: no main.tex`);
-      return { id, dir, source: { main: "main.tex", files } };
+      const historyFile = join(dir, "history.md");
+      return { id, dir, source: { main: "main.tex", files }, history: existsSync(historyFile) ? readFileSync(historyFile, "utf8") : undefined };
     });
 }
 

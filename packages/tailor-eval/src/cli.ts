@@ -1,6 +1,8 @@
 // tailor-eval: measures whether tailoring helps and stays honest.
 //   tailor-eval run [--data eval-data] [--out eval-results/<name>] [--provider claude-code] [--model sonnet]
 //                   [--judge-provider claude-code] [--judge-model opus] [--only <substring,…>] [--limit N]
+//                   [--questions]   let the engine ask its gap questions; a simulated candidate answers
+//                                   them from each resume's history.md (resumes without one skip them)
 //   tailor-eval report <run folder>
 // A run saves each case as it finishes; running again with the same --out continues where it stopped
 // (after a usage limit, say). Cases that finished are never redone.
@@ -23,6 +25,7 @@ const { values: opt, positionals } = parseArgs({
     "judge-model": { type: "string", default: "opus" },
     only: { type: "string" },
     limit: { type: "string" },
+    questions: { type: "boolean", default: false },
   },
 });
 const [command, arg] = positionals;
@@ -80,7 +83,7 @@ if (command === "report") {
     const log = (m: string) => console.log(`  [${i + 1}/${todo.length}] ${c.id} · ${Math.round((Date.now() - t0) / 1000)}s · ${m}`);
     log("starting");
     try {
-      const r = await runCase(c, { engineLLM, judgeLLM, signal: ctl.signal, onStep: log });
+      const r = await runCase(c, { engineLLM, judgeLLM, signal: ctl.signal, onStep: log, questions: opt.questions });
       writeFileSync(join(outDir, "cases", `${c.id}.json`), JSON.stringify(r, null, 2) + "\n");
       const yn = (b?: boolean) => (b === undefined ? "–" : b ? "yes" : "no");
       log(`${r.status}: advanced ${yn(r.screen?.original.advance)} → ${yn(r.screen?.tailored.advance)}, fit ${r.screen ? `${r.screen.original.fit} → ${r.screen.tailored.fit}` : "–"}, audit ${r.audit ? r.audit.issues.length : "–"} issue(s)`);
