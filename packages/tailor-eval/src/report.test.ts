@@ -45,6 +45,6 @@ test("summary: advance rates, gains and losses, fit change, audit counts", () =>
 test("the report renders, with the decisions that changed", () => {
   const md = markdownReport([result("a", screen(false, 5, 2), screen(true, 7, 4))], { engine: "e", judge: "j", startedAt: "now" });
   assert.match(md, /original → tailored \| 0 → 1 of 1 \(0% → 100%\)/);
-  assert.match(md, /\| no → yes \| 5 → 7 \| 2 → 4 \|/);
+  assert.match(md, /\| – \| no → yes \| 5 → 7 \| 2 → 4 \|/);
   assert.match(md, /\*\*a\*\* \(gained\)/);
 });

@@ -98,8 +98,8 @@ export function markdownReport(results: CaseResult[], meta: { engine: string; ju
     ``,
     `## Cases`,
     ``,
-    `| Case | Level | Advanced (orig → tailored) | Fit | Must-haves seen | Audit (H/M/L) | Edits (dropped) | Pages | Time |`,
-    `|---|---|---|---|---|---|---|---|---|`,
+    `| Case | Level | Fit | Advanced (orig → tailored) | Fit | Must-haves seen | Audit (H/M/L) | Edits (dropped) | Pages | Time |`,
+    `|---|---|---|---|---|---|---|---|---|---|`,
   ];
   for (const r of results) {
     const sc = r.screen;
@@ -108,13 +108,23 @@ export function markdownReport(results: CaseResult[], meta: { engine: string; ju
     const e = r.engine;
     const yn = (b: boolean) => (b ? "yes" : "no");
     lines.push(
-      `| ${r.resume} → ${r.posting.company}: ${r.posting.role} | ${r.posting.level ?? ""} | ${r.status !== "ready" ? r.status : sc ? `${yn(sc.original.advance)} → ${yn(sc.tailored.advance)}` : "–"} | ${sc ? `${sc.original.fit} → ${sc.tailored.fit}` : "–"} | ${sc ? `${sc.original.shown.length} → ${sc.tailored.shown.length}` : "–"} | ${r.audit ? `${sev("high")}/${sev("medium")}/${sev("low")}` : "–"} | ${e?.edits ?? "–"} (${e?.dropped ?? "–"}) | ${e?.pagesBefore ?? "–"}→${e?.pagesAfter ?? "–"} | ${e?.seconds ?? "–"}s |`,
+      `| ${r.resume} → ${r.posting.company}: ${r.posting.role} | ${r.posting.level ?? ""} | ${r.fit ? `${r.fit.level} (${r.fit.must.strong}/${r.fit.must.total})` : "–"} | ${r.status !== "ready" ? r.status : sc ? `${yn(sc.original.advance)} → ${yn(sc.tailored.advance)}` : "–"} | ${sc ? `${sc.original.fit} → ${sc.tailored.fit}` : "–"} | ${sc ? `${sc.original.shown.length} → ${sc.tailored.shown.length}` : "–"} | ${r.audit ? `${sev("high")}/${sev("medium")}/${sev("low")}` : "–"} | ${e?.edits ?? "–"} (${e?.dropped ?? "–"}) | ${e?.pagesBefore ?? "–"}→${e?.pagesAfter ?? "–"} | ${e?.seconds ?? "–"}s |`,
     );
   }
   const flips = results.filter((r) => r.screen && r.screen.original.advance !== r.screen.tailored.advance);
   if (flips.length) {
     lines.push(``, `## Decisions that changed`, ``);
     for (const r of flips) lines.push(`- **${r.id}** (${r.screen!.tailored.advance ? "gained" : "lost"}): original: ${r.screen!.original.reason} Tailored: ${r.screen!.tailored.reason}`);
+  }
+  // Does the engine's fit call (made before any rewriting) predict the recruiter's decision?
+  const called = results.filter((r) => r.fit && r.screen);
+  if (called.length) {
+    lines.push(``, `## The engine's fit call vs the recruiter`, ``, `| Fit (before tailoring) | Cases | Original advanced | Tailored advanced |`, `|---|---|---|---|`);
+    for (const level of ["strong", "stretch", "long-shot"] as const) {
+      const rs = called.filter((r) => r.fit!.level === level);
+      if (!rs.length) continue;
+      lines.push(`| ${level} | ${rs.length} | ${rs.filter((r) => r.screen!.original.advance).length} | ${rs.filter((r) => r.screen!.tailored.advance).length} |`);
+    }
   }
   const asked = results.filter((r) => r.questions?.length);
   if (asked.length) {

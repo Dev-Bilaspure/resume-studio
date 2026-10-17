@@ -1,6 +1,6 @@
 // Runs one case: tailor the resume for the posting with the real engine, then audit and screen the result.
 import { LLMError, type LLM } from "@resume-studio/llm";
-import { createTailorEngine, jobCompany, jobTitle, memoryFactStore, memorySessionStore, type Session } from "@resume-studio/tailor";
+import { assessFit, createTailorEngine, jobCompany, jobTitle, memoryFactStore, memorySessionStore, type FitAssessment, type Session } from "@resume-studio/tailor";
 import { latexAdapter } from "@resume-studio/tailor-latex";
 import { latexmkVerifier } from "@resume-studio/tailor-latex/node";
 import { jobInput, type Case } from "./data.ts";
@@ -35,6 +35,8 @@ export interface CaseResult {
     strongAfter: number;
     requirements: number;
   };
+  /** The engine's fit call before rewriting (from its requirement matching), to check against the recruiter. */
+  fit?: FitAssessment;
   /** The engine's gap questions and the simulated candidate's answers (null: "I haven't done this"). */
   questions?: { id: string; topic: string; question: string; answer: string | null }[];
   /** Facts the engine learned from those answers. */
@@ -127,6 +129,7 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
 
   const before = r?.before.build?.text;
   const after = r?.after.build?.text;
+  if (s.profile && s.matches) result.fit = assessFit(s.profile, s.matches);
   result.questions = asked;
   result.learned = s.newFacts.map((f) => f.text);
   result.strategy = s.strategy;
