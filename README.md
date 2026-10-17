@@ -25,11 +25,16 @@ apps/web/                 the editor (Next.js): app, compiler, templates, built-
 packages/llm/             one interface over Claude Code, OpenAI, Anthropic and Vertex AI
 packages/tailor/          the job-tailoring engine (format-neutral)
 packages/tailor-latex/    the engine's LaTeX adapter
-packages/tailor-cli/      `pnpm tailor <resume-dir> --jd jd.txt --company … --role "…"`
+packages/tailor-cli/      `resume-tailor`: tailoring from the command line
+packages/tailor-server/   the engine as an HTTP service (Docker image included)
+packages/tailor-mcp/      the engine as an MCP server, for Claude Desktop and other assistants
+packages/tailor-eval/     measures tailoring quality: blind recruiter screens and a truthfulness audit
 ```
 
-Packages depend one way only (llm ← tailor ← tailor-latex ← cli/web): a cycle makes pnpm link the
-packages into each other endlessly, and the bundler walks that loop until it runs out of memory.
+Packages depend one way only (llm ← tailor ← tailor-latex ← cli/server/mcp/eval/web): a cycle makes
+pnpm link the packages into each other endlessly, and the bundler walks that loop until it runs out of
+memory. In the repo they run from TypeScript source; `pnpm build` also compiles them to `dist/`, which is
+what a packed or published copy uses.
 
 ## Where things live
 
@@ -117,6 +122,39 @@ order and physical layout) and checked:
 
 The templates (Classic, Modern, Blank) pass every check: T1 fonts with `glyphtounicode`, f-ligatures
 off, no hyphenation, unbreakable contact items, and entries that read left to right with inline dates.
+
+## Tailoring for a job
+
+**Tailor for a job** (home page, or the editor's top bar) takes a job posting and makes a tailored copy of
+a resume. The engine reads the posting (requirements, must-have keywords, level, hard filters), matches
+each requirement to your bullets and saved facts, asks about must-haves your resume doesn't show, then
+rewrites the relevant parts in the job's language. You review every change as a diff with its reason and
+evidence, watch the PDF update as you accept or reject, and save the result as a new resume (the
+original is never changed; the posting is kept with it as `jd.md`).
+
+It never invents experience. Every new claim has to trace back to your resume or to an answer you gave:
+new numbers are refused outright, a technology may only appear where its evidence names it, a second
+model fact-checks every change, and the draft is compiled to prove it builds and fits the page. Answers
+you give become facts (`resumes/_profile/facts.json`) that later applications can use.
+
+The model is your choice under **AI providers**: your Claude Code login (no key needed), the Anthropic
+API, OpenAI or Google Vertex AI. Keys are kept in the macOS Keychain.
+
+The same engine also runs outside the app:
+
+```sh
+pnpm tailor resumes/my-cv --jd posting.txt --company Acme --role "Backend Engineer" --out resumes/my-cv-acme
+TAILOR_ENABLE_CLAUDE_CODE=1 node packages/tailor-server/src/main.ts     # HTTP API, see its README
+node packages/tailor-mcp/bin/resume-tailor-mcp.js                       # MCP server, see its README
+```
+
+**Measuring it.** `pnpm eval run --model opus --judge-model opus` tailors each resume in
+`eval-data/resumes/` for each job posting in `eval-data/jds/` (pairs in `eval-data/cases.json`), then has
+an independent judge (a) audit the tailored text against the original for anything unsupported and
+(b) screen the original and tailored resumes blind, as a recruiter, in both orders. The report
+(`eval-results/<run>/report.md`) shows how often the tailored resume is the one advanced, the fit change,
+and every truthfulness issue. Runs resume where they stopped (e.g. after a usage limit). The data and
+results stay on your machine.
 
 ## Shortcuts
 
