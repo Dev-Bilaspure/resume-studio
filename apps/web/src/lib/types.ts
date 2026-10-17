@@ -155,6 +155,11 @@ export interface SnapshotInfo {
 }
 
 export interface SystemStatus {
+  /**
+   * Where TeX runs: this machine's TeX Live, or the compile service (the TeX Live container from
+   * docker-compose.yml). `error`: the service can't be reached.
+   */
+  compiler: { mode: "local" | "service"; url: string | null; error: string | null };
   tex: { available: boolean; latexmk: string | null; engines: Record<Engine, string | null>; synctex: string | null; version: string | null };
   ats: { available: boolean; missing: string[] };
   git: { available: boolean };

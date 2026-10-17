@@ -2,23 +2,39 @@ import "server-only";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import {
+  BUILTIN_LATEXMKRC,
+  PROJECT_RC_FILES,
+  TexServiceError,
+  folderEntries,
+  jobName,
+  latexmkInvocation,
+  type CompileResponse,
+} from "@resume-studio/tex-service";
 import type { BuildResult, BuildState, Diagnostic, Engine } from "@/lib/types";
 import { analyzePdf, readSources } from "./ats";
-import { BUILD_DIR, COMPILE_TIMEOUT_MS, KEEP_BUILDS, PUBLISH_DIR, findTool } from "./config";
+import { BUILD_DIR, COMPILE_TIMEOUT_MS, KEEP_BUILDS, PUBLISH_DIR, STATE_DIR, findTool } from "./config";
 import { emit } from "./events";
 import { isJunk, sha256 } from "./fsutil";
 import { needsXeTeX, requestedFonts } from "./engine";
 import { attributeToUsepackage, parseBibLog, parseLog } from "./logparser";
 import { missingMacFonts } from "./macfonts";
 import { run } from "./run";
+import { releaseBuildDir, serviceProject, texService, toolchainMode } from "./toolchain";
 import { META_FILE, getResume, listFiles, projectPreamble, resumeDir, textFiles } from "./workspace";
 
-const ENGINE_FLAG: Record<Engine, string> = { pdflatex: "-pdf", xelatex: "-xelatex", lualatex: "-lualatex", latex: "-pdfdvi" };
-
-/** Rules every build loads (glossaries, nomenclature, dvipdfmx); see tex/latexmkrc. */
-const BUILTIN_RC = join(/*turbopackIgnore: true*/ process.cwd(), "tex", "latexmkrc");
-/** A project's own latexmkrc, as Overleaf honours it (only for trusted projects: it's Perl code). */
-const PROJECT_RC = ["latexmkrc", ".latexmkrc"];
+/** Rules every build loads (glossaries, nomenclature, dvipdfmx), written where latexmk can read them. */
+const BUILTIN_RC = join(STATE_DIR, "latexmkrc");
+let rcWritten: Promise<void> | null = null;
+function ensureBuiltinRc() {
+  return (rcWritten ??= (async () => {
+    await mkdir(STATE_DIR, { recursive: true });
+    if ((await readFile(BUILTIN_RC, "utf8").catch(() => null)) !== BUILTIN_LATEXMKRC) await writeFile(BUILTIN_RC, BUILTIN_LATEXMKRC);
+  })().catch((e) => {
+    rcWritten = null;
+    throw e;
+  }));
+}
 
 export interface RawCompile {
   ok: boolean;
@@ -53,87 +69,44 @@ export interface CompileOptions {
   fontSources?: string;
 }
 
+/** latexmk's exit, from wherever it ran; its outputs are then in the build folder. */
+interface LatexmkRun {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  /** Couldn't start the build: no TeX, or the compile service is unreachable. */
+  startFailed: string | null;
+  /** Notes about the build itself (fonts swapped for stand-ins). */
+  notes: Diagnostic[];
+}
+
 export async function compileDir(opts: CompileOptions): Promise<RawCompile> {
-  const latexmk = findTool("latexmk");
-  if (!latexmk) {
-    return {
-      ok: false,
-      timedOut: false,
-      startFailed: "TeX isn't installed (latexmk not found). Install MacTeX (brew install --cask mactex-no-gui), then recompile.",
-      pdfPath: null,
-      synctexPath: null,
-      diagnostics: [],
-      outputTail: "",
-    };
-  }
-  await mkdir(opts.outDir, { recursive: true });
-  await mirrorSources(opts.srcDir, opts.outDir);
   // Like Overleaf (latexmk -cd), TeX runs in the main file's folder: a main file in examples/ finds
   // examples/awesome-cv.cls and \input{cv/education} relative to itself.
   const mainDir = dirname(opts.mainFile);
   const cwd = join(/*turbopackIgnore: true*/ opts.outDir, mainDir);
-  const base = basename(opts.mainFile).replace(/\.(tex|xtx|ltx)$/, "");
+  const base = jobName(opts.mainFile);
   const out = (ext: string) => join(/*turbopackIgnore: true*/ cwd, `${base}.${ext}`);
   const started = Date.now();
 
-  const res = await run(
-    latexmk,
-    [
-      ENGINE_FLAG[opts.engine],
-      "-norc", // no user/system latexmkrc: every machine builds the same way
-      ...(existsSync(BUILTIN_RC) ? ["-r", BUILTIN_RC] : []),
-      ...(opts.trusted ? PROJECT_RC.filter((f) => existsSync(join(/*turbopackIgnore: true*/ opts.srcDir, f))).flatMap((f) => ["-r", join(/*turbopackIgnore: true*/ opts.outDir, f)]) : []),
-      ...(opts.trusted ? ["-shell-escape"] : []),
-      // Overleaf's default: carry on past errors (latexmk -f), so bibliography and cross-reference
-      // passes still run and the partial PDF is as complete as it can be.
-      ...(opts.haltOnError ? ["-halt-on-error"] : ["-f"]),
-      "-interaction=nonstopmode",
-      "-file-line-error",
-      "-synctex=1",
-      "-recorder",
-      // A forced build (Recompile) must really run TeX: without -g, latexmk sees unchanged sources
-      // after a failure and just reports the old errors, e.g. after you've installed a missing package.
-      ...(opts.force ? ["-g"] : []),
-      basename(opts.mainFile),
-    ],
-    {
-      cwd,
-      timeoutMs: COMPILE_TIMEOUT_MS,
-      env: {
-        // Unwrapped log lines (TeX wraps at 79 columns by default) make the log parseable.
-        max_print_line: "10000",
-        error_line: "254",
-        half_error_line: "238",
-        // Restricted \write18 (TeX Live's default): only the vetted commands TeX Live lists (epstopdf for
-        // EPS images, bibtex, kpsewhich, …). Full shell escape only for trusted projects (-shell-escape).
-        shell_escape: opts.trusted ? "t" : "p",
-        // TeX may only write files under the working directory (the build folder).
-        openout_any: "p",
-      },
-    },
-  );
-
-  if (res.error) {
-    return {
-      ok: false,
-      timedOut: false,
-      startFailed: `Couldn't run latexmk: ${res.error.message}`,
-      pdfPath: null,
-      synctexPath: null,
-      diagnostics: [],
-      outputTail: "",
-    };
+  const res = toolchainMode() === "service" ? await latexmkOnService(opts, cwd, base) : await latexmkHere(opts, cwd);
+  if (res.startFailed) {
+    return { ok: false, timedOut: false, startFailed: res.startFailed, pdfPath: null, synctexPath: null, diagnostics: [], outputTail: "" };
   }
 
   const log = await readFile(out("log"), "utf8").catch(() => "");
   // Paths in the log are the mirror's, which match the source folder's layout.
-  const diagnostics = attributeToUsepackage(
+  const diagnostics = [
+    ...res.notes,
+    ...attributeToUsepackage(
     [
       ...parseLog(log, { rootDir: opts.outDir, cwd: mainDir }),
       ...parseBibLog(await readFile(out("blg"), "utf8").catch(() => ""), { rootDir: opts.outDir, cwd: mainDir }),
     ],
-    await readSourcesIn(opts.srcDir, opts.mainFile),
-  );
+      await readSourcesIn(opts.srcDir, opts.mainFile),
+    ),
+  ];
   // A PDF from an earlier build is still in outDir when this one fails before writing; only trust a
   // complete PDF written during this run.
   const pdf = out("pdf");
@@ -176,6 +149,75 @@ export async function compileDir(opts: CompileOptions): Promise<RawCompile> {
     diagnostics,
     outputTail: tail,
   };
+}
+
+/** latexmk on this machine, in a mirror of the sources (see mirrorSources). */
+async function latexmkHere(opts: CompileOptions, cwd: string): Promise<LatexmkRun> {
+  const latexmk = findTool("latexmk");
+  if (!latexmk) {
+    const fail = "TeX isn't installed (latexmk not found). Start the compile service with `docker compose up -d` (or install MacTeX: brew install --cask mactex-no-gui), then recompile.";
+    return { code: null, stdout: "", stderr: "", timedOut: false, startFailed: fail, notes: [] };
+  }
+  await mkdir(opts.outDir, { recursive: true });
+  await mirrorSources(opts.srcDir, opts.outDir);
+  await ensureBuiltinRc();
+  const { args, env } = latexmkInvocation({
+    engine: opts.engine,
+    mainFile: basename(opts.mainFile),
+    force: opts.force,
+    trusted: opts.trusted,
+    haltOnError: opts.haltOnError,
+    builtinRc: BUILTIN_RC,
+    projectRcs: PROJECT_RC_FILES.filter((f) => existsSync(join(/*turbopackIgnore: true*/ opts.srcDir, f))).map((f) => join(/*turbopackIgnore: true*/ opts.outDir, f)),
+  });
+  const res = await run(latexmk, args, { cwd, timeoutMs: COMPILE_TIMEOUT_MS, env });
+  if (res.error) return { code: null, stdout: "", stderr: "", timedOut: false, startFailed: `Couldn't run latexmk: ${res.error.message}`, notes: [] };
+  return { code: res.code, stdout: res.stdout, stderr: res.stderr, timedOut: res.timedOut, startFailed: null, notes: [] };
+}
+
+/** A source folder's files as the compile service gets them: what mirrorSources copies for a local build. */
+export function serviceSources(srcDir: string) {
+  return folderEntries(srcDir, (_path, name) => !isJunk(name) && name !== ".git" && name !== META_FILE && !name.startsWith("."));
+}
+
+/**
+ * latexmk on the compile service: uploads what changed, builds there, and writes what the build produced
+ * (log, .blg, PDF, SyncTeX) into the build folder, so everything after this reads them as from a local build.
+ */
+async function latexmkOnService(opts: CompileOptions, cwd: string, base: string): Promise<LatexmkRun> {
+  const service = texService();
+  const project = serviceProject(opts.outDir);
+  let r: CompileResponse;
+  try {
+    await service.sync(project, await serviceSources(opts.srcDir));
+    r = await service.compile(project, {
+      main: opts.mainFile,
+      engine: opts.engine,
+      force: opts.force,
+      trusted: opts.trusted,
+      haltOnError: opts.haltOnError,
+      timeoutMs: COMPILE_TIMEOUT_MS,
+    });
+  } catch (e) {
+    if (e instanceof TexServiceError) return { code: null, stdout: "", stderr: "", timedOut: false, startFailed: e.message, notes: [] };
+    throw e;
+  }
+  // Paths in the log name the service's folder; the log parser expects the build folder's.
+  const local = (text: string) => text.replaceAll(`${r.root}/`, `${opts.outDir}/`);
+  await mkdir(cwd, { recursive: true });
+  const put = async (ext: string, data: string | null, enc: "utf8" | "base64") => {
+    if (data !== null) await writeFile(join(/*turbopackIgnore: true*/ cwd, `${base}.${ext}`), enc === "utf8" ? local(data) : Buffer.from(data, "base64"));
+  };
+  await Promise.all([put("log", r.log, "utf8"), put("blg", r.blg, "utf8"), put("pdf", r.pdf, "base64"), put("synctex.gz", r.synctex, "base64")]);
+  const notes: Diagnostic[] = r.substitutions.map(({ from, to }) => ({
+    severity: "info",
+    kind: "font",
+    file: null,
+    line: null,
+    message: `Built with ${to} in place of ${from}`,
+    detail: `${from} isn't available in the compile service (it's a commercial font). ${to} has the same character widths, so lines and pages break the same way; the letters look slightly different. Your file still says ${from}.`,
+  }));
+  return { code: r.code, stdout: local(r.stdout), stderr: local(r.stderr), timedOut: r.timedOut, startFailed: null, notes };
 }
 
 const MIRROR_MANIFEST = ".resume-studio-mirror.json";
@@ -234,7 +276,8 @@ export async function compileWithFallback(opts: CompileOptions, memo: { xeLua: b
     message: "Built with LuaLaTeX instead of XeLaTeX",
     detail: `XeLaTeX on macOS only finds fonts installed in macOS (Font Book)${fonts.length ? `, so it couldn't load ${fonts.join(", ")}` : ""}, which come with TeX Live. LuaLaTeX finds TeX Live's fonts, and Overleaf's XeLaTeX finds them too. To build with XeLaTeX here, install those fonts in macOS.`,
   });
-  if (opts.engine !== "xelatex" || process.platform !== "darwin") return { ...(await compileDir(opts)), engine: opts.engine };
+  // Only TeX on macOS has this problem: the compile service runs Linux TeX Live, like Overleaf.
+  if (opts.engine !== "xelatex" || process.platform !== "darwin" || toolchainMode() === "service") return { ...(await compileDir(opts)), engine: opts.engine };
   // Predict instead of finding out: a XeLaTeX pass that looks up missing fonts takes ~3 s per font
   // (AltaCV: 12 fonts, 34 s a pass). If the document asks for fonts macOS doesn't have, go straight
   // to LuaLaTeX.
@@ -373,7 +416,7 @@ class ResumeCompiler {
   /** "Clear cached files": drops the aux files (stale or corrupt ones can break a build), then rebuilds. */
   async clean() {
     await this.idle();
-    await rm(join(BUILD_DIR, this.id), { recursive: true, force: true });
+    await releaseBuildDir(join(BUILD_DIR, this.id));
     this.schedule(true);
   }
 

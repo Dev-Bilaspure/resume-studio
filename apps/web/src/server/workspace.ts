@@ -5,6 +5,7 @@ import { extname, join, relative } from "node:path";
 import { z } from "zod";
 import type { Engine, FileContent, FileEntry, ResumeMeta } from "@/lib/types";
 import { BUILD_DIR, PUBLISH_DIR, RESUMES_DIR, STATE_DIR, TRASH_DIR } from "./config";
+import { releaseBuildDir } from "./toolchain";
 import { effectiveEngine, localDependencies, magicEngine, rankMainCandidates } from "./engine";
 import { HttpError, atomicWrite, isJunk, safeJoin, sha256, slugify, toPosix } from "./fsutil";
 
@@ -287,7 +288,7 @@ export async function trashResume(id: string): Promise<void> {
   if (!existsSync(dir)) throw new HttpError(404, `No resume "${id}"`);
   await mkdir(TRASH_DIR, { recursive: true });
   await rename(dir, join(TRASH_DIR, `${id}-${new Date().toISOString().replace(/[:.]/g, "-")}`));
-  await rm(join(BUILD_DIR, id), { recursive: true, force: true });
+  await releaseBuildDir(join(BUILD_DIR, id));
   await rm(join(PUBLISH_DIR, id), { recursive: true, force: true });
 }
 

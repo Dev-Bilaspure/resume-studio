@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { LatexEditor, type LatexEditorHandle } from "@/components/editor/latex-editor";
 import { NewResumeDialog } from "@/components/new-resume-dialog";
 import { PdfPreview, type PdfPreviewHandle } from "@/components/preview/pdf-preview";
+import { TexSetupHint } from "@/components/tex-setup-hint";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -541,8 +542,7 @@ export function WorkspaceView({ id }: { id: string }) {
         <div className="flex shrink-0 items-center gap-3 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm">
           <TriangleAlert className="size-4 shrink-0 text-warning" />
           <span className="flex-1">
-            TeX isn&apos;t installed, so nothing can compile. Install MacTeX:{" "}
-            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">brew install --cask mactex-no-gui</code>, then check again.
+            <TexSetupHint system={ws.system!} /> Then check again.
           </span>
           <Button
             size="sm"

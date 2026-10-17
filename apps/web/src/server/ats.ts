@@ -2,43 +2,38 @@ import "server-only";
 import { readFile, stat } from "node:fs/promises";
 import type { AtsReport } from "@/lib/types";
 import { parsePdffonts, parsePdfinfo, runAtsChecks } from "./ats-checks";
-import { findTool } from "./config";
-import { run } from "./run";
+import { inspectPdf, popplerMissing, toolchainMode } from "./toolchain";
 
-/** poppler-utils: `brew install poppler`. */
-const TOOLS = ["pdftotext", "pdffonts", "pdfinfo"] as const;
-
-export function atsToolsMissing(): string[] {
-  return TOOLS.filter((t) => !findTool(t));
+/** Poppler tools (pdftotext, pdffonts, pdfinfo) the active toolchain lacks. */
+export async function atsToolsMissing(): Promise<string[]> {
+  return popplerMissing();
 }
 
 /** Extracts the PDF as an ATS would and runs the readiness checks. */
 export async function analyzePdf(pdfPath: string, sources: Record<string, string>, mainFile: string): Promise<AtsReport | null> {
-  const missing = atsToolsMissing();
+  const missing = await atsToolsMissing();
   if (missing.length) {
     return {
       score: 0,
       checks: [],
       text: "",
       stats: { pages: 0, words: 0, fileSizeKB: 0, fonts: [], title: null, author: null },
-      unavailable: `Install poppler for ATS checks (missing ${missing.join(", ")}): brew install poppler`,
+      unavailable:
+        toolchainMode() === "service"
+          ? "ATS checks need the compile service: start it with `docker compose up -d`"
+          : `Install poppler for ATS checks (missing ${missing.join(", ")}): brew install poppler`,
     };
   }
-  const [text, layout, fonts, info, st] = await Promise.all([
-    run("pdftotext", ["-enc", "UTF-8", "-nopgbrk", pdfPath, "-"], { timeoutMs: 15_000 }),
-    run("pdftotext", ["-enc", "UTF-8", "-nopgbrk", "-layout", pdfPath, "-"], { timeoutMs: 15_000 }),
-    run("pdffonts", [pdfPath], { timeoutMs: 15_000 }),
-    run("pdfinfo", ["-enc", "UTF-8", pdfPath], { timeoutMs: 15_000 }),
-    stat(pdfPath),
-  ]);
-  if (text.code !== 0) return null;
-  const meta = parsePdfinfo(info.stdout);
+  const [r, st] = await Promise.all([inspectPdf(pdfPath, { text: true, layout: true, fonts: true, info: true }), stat(pdfPath)]);
+  const { text, layout, fonts, info } = r;
+  if (!text || text.code !== 0) return null;
+  const meta = parsePdfinfo(info?.stdout ?? "");
   return runAtsChecks({
     text: text.stdout,
-    layoutText: layout.code === 0 ? layout.stdout : undefined,
+    layoutText: layout?.code === 0 ? layout.stdout : undefined,
     pages: Number(meta["Pages"]) || 1,
     fileSizeKB: Math.round(st.size / 1024),
-    fonts: parsePdffonts(fonts.stdout),
+    fonts: parsePdffonts(fonts?.stdout ?? ""),
     title: meta["Title"] || null,
     author: meta["Author"] || null,
     sources,

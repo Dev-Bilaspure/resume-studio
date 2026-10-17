@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AiSettingsDialog } from "@/components/ai/ai-settings-dialog";
+import { TexSetupHint } from "@/components/tex-setup-hint";
 import { NewResumeDialog } from "@/components/new-resume-dialog";
 import { TailoringStrip } from "@/components/tailor/tailoring-strip";
 import { PdfThumb } from "@/components/preview/pdf-thumb";
@@ -136,16 +137,14 @@ export function ResumeGallery() {
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-sm">
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
             <div>
-              <p className="font-medium">TeX isn&apos;t installed</p>
+              <p className="font-medium">{system.compiler.mode === "service" ? "The compile service isn't running" : "TeX isn't installed"}</p>
               <p className="mt-0.5 text-muted-foreground">
-                Install MacTeX (full TeX Live, the same as Overleaf):{" "}
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">brew install --cask mactex-no-gui</code>. Resumes compile as
-                soon as it&apos;s there.
+                <TexSetupHint system={system} /> Resumes compile as soon as it&apos;s there.
               </p>
             </div>
           </div>
         )}
-        {system && !system.ats.available && (
+        {system && system.tex.available && !system.ats.available && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm text-muted-foreground">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" />
             <p>

@@ -1,6 +1,7 @@
 import "server-only";
 import { watch, type FSWatcher } from "chokidar";
 import { relative, sep } from "node:path";
+import { TEX_ENGINES } from "@resume-studio/tex-service";
 import type { Engine, SystemStatus } from "@/lib/types";
 import { atsToolsMissing } from "./ats";
 import { RESUMES_DIR, ROOT, findTool } from "./config";
@@ -8,6 +9,7 @@ import { getCompiler } from "./compiler";
 import { emit } from "./events";
 import { isJunk, toPosix } from "./fsutil";
 import { run } from "./run";
+import { serviceInfo, texService, toolchainMode } from "./toolchain";
 import { maybeAutoSnapshot } from "./snapshots";
 import { ID_RE, META_FILE, ensureDirs, hashOnDisk } from "./workspace";
 
@@ -117,19 +119,49 @@ export async function compilerFor(id: string) {
 let statusCache: { at: number; value: SystemStatus } | null = null;
 
 export async function systemStatus(): Promise<SystemStatus> {
-  if (statusCache && Date.now() - statusCache.at < 10_000) return statusCache.value;
-  const engines = Object.fromEntries((["pdflatex", "xelatex", "lualatex", "latex"] as Engine[]).map((e) => [e, findTool(e)])) as Record<Engine, string | null>;
+  const service = toolchainMode() === "service";
+  if (!service && statusCache && Date.now() - statusCache.at < 10_000) return statusCache.value;
+  const git = { available: !!findTool("git") };
+  let value: SystemStatus;
+  if (service) {
+    // TeX runs in the compile service: report its toolchain (paths are inside the container).
+    const info = await serviceInfo();
+    const url = texService().url;
+    if (info instanceof Error) {
+      const engines = Object.fromEntries(TEX_ENGINES.map((e) => [e, null])) as Record<Engine, string | null>;
+      value = {
+        compiler: { mode: "service", url, error: info.message },
+        tex: { available: false, latexmk: null, engines, synctex: null, version: null },
+        ats: { available: false, missing: ["pdftotext", "pdffonts", "pdfinfo"] },
+        git,
+        root: ROOT,
+      };
+    } else {
+      const engines = Object.fromEntries(TEX_ENGINES.map((e) => [e, info.tex.engines[e] ? e : null])) as Record<Engine, string | null>;
+      value = {
+        compiler: { mode: "service", url, error: null },
+        tex: { available: info.tex.latexmk && info.tex.engines.pdflatex, latexmk: info.tex.latexmk ? "latexmk" : null, engines, synctex: info.tex.synctex ? "synctex" : null, version: info.tex.version },
+        ats: { available: info.poppler.missing.length === 0, missing: info.poppler.missing },
+        git,
+        root: ROOT,
+      };
+    }
+    // Not cached here: serviceInfo is, briefly, so a service stopping or starting shows within seconds.
+    return value;
+  }
+  const engines = Object.fromEntries(TEX_ENGINES.map((e) => [e, findTool(e)])) as Record<Engine, string | null>;
   const latexmk = findTool("latexmk");
   let version: string | null = null;
   if (engines.pdflatex) {
     const v = await run(engines.pdflatex, ["--version"], { timeoutMs: 5000 });
     version = /TeX Live \d{4}/.exec(v.stdout)?.[0] ?? v.stdout.split("\n")[0] ?? null;
   }
-  const missing = atsToolsMissing();
-  const value: SystemStatus = {
+  const missing = await atsToolsMissing();
+  value = {
+    compiler: { mode: "local", url: null, error: null },
     tex: { available: !!latexmk && !!engines.pdflatex, latexmk, engines, synctex: findTool("synctex"), version },
     ats: { available: missing.length === 0, missing },
-    git: { available: !!findTool("git") },
+    git,
     root: ROOT,
   };
   statusCache = { at: Date.now(), value };

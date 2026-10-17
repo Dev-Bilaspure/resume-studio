@@ -8,6 +8,7 @@ import { compileWithFallback } from "./compiler";
 import { emit } from "./events";
 import { HttpError, safeJoin } from "./fsutil";
 import { run } from "./run";
+import { releaseBuildDir } from "./toolchain";
 import { engineFor, getResume, resumeDir } from "./workspace";
 
 // Snapshots are git commits in a repository the app owns (.resume-studio/git) whose work tree is
@@ -265,7 +266,7 @@ async function buildPreview(id: string, sha: string): Promise<BuildResult> {
     outputTail: raw.outputTail,
     ats: null,
   };
-  await rm(join(root, "build"), { recursive: true, force: true });
+  await releaseBuildDir(join(root, "build"));
   await rm(tar, { force: true });
   if (raw.startFailed === null) await writeFile(cached, JSON.stringify(result));
   return result;

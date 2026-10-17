@@ -24,7 +24,7 @@ import { compileWithFallback } from "./compiler";
 import { RESUMES_DIR, STATE_DIR } from "./config";
 import { emit } from "./events";
 import { HttpError, atomicWrite, slugify } from "./fsutil";
-import { run } from "./run";
+import { inspectPdf, releaseBuildDir } from "./toolchain";
 import { createSnapshot } from "./snapshots";
 import { createResume, engineFor, getResume, listFiles, resumeDir, updateResume } from "./workspace";
 
@@ -117,8 +117,8 @@ function verifierFor(sessionId: string, resumeId: string, meta: ResumeMeta): Bui
     const pages = ats && !ats.unavailable ? ats.stats.pages : null;
     let overflowLines: number | undefined;
     if (maxPages && pages && pages > maxPages) {
-      const r = await run("pdftotext", ["-f", String(maxPages + 1), "-l", String(pages), "-enc", "UTF-8", pdf, "-"], { timeoutMs: 15_000 });
-      overflowLines = r.stdout.split("\n").filter((l) => l.trim()).length;
+      const r = await inspectPdf(pdf, { text: true, first: maxPages + 1, last: pages });
+      overflowLines = (r.text?.stdout ?? "").split("\n").filter((l) => l.trim()).length;
     }
     return { ok: raw.ok || !errors.length, pages, overflowLines, text: ats?.text, atsScore: ats && !ats.unavailable ? ats.score : null, errors };
   }
@@ -347,8 +347,11 @@ export async function finalizeSession(id: string, accepted: string[], name: stri
   }).catch(() => null);
   emit({ type: "resumes" });
   // The build folders served the review; reopening it rebuilds what it needs.
-  await rm(workDir(id), { recursive: true, force: true });
-  await rm(workDir(`${id}-preview`), { recursive: true, force: true });
+  // The draft builds' folders, here and on the compile service.
+  for (const dir of [workDir(id), workDir(`${id}-preview`)]) {
+    await releaseBuildDir(join(dir, "build"));
+    await rm(dir, { recursive: true, force: true });
+  }
   return meta;
 }
 

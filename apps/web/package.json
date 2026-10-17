@@ -30,6 +30,7 @@
     "@resume-studio/llm": "workspace:*",
     "@resume-studio/tailor": "workspace:*",
     "@resume-studio/tailor-latex": "workspace:*",
+    "@resume-studio/tex-service": "workspace:*",
     "ai-sdk-provider-claude-code": "4.3.3",
     "chokidar": "^5.0.0",
     "class-variance-authority": "^0.7.1",

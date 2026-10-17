@@ -2,10 +2,13 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { copyFile, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { TexServiceError } from "@resume-studio/tex-service";
 import type { OutputFile, ProjectSymbols, WordCount } from "@/lib/types";
+import { serviceSources } from "./compiler";
 import { BUILD_DIR, RESUMES_DIR, STATE_DIR } from "./config";
 import { HttpError, safeJoin, slugify } from "./fsutil";
 import { run } from "./run";
+import { serviceProject, texService, toolchainMode } from "./toolchain";
 import { emptySymbols, scanBib, scanTex } from "./symbols";
 import { META_FILE, createResumeFromFolder, listFiles, resumeDir } from "./workspace";
 
@@ -133,8 +136,22 @@ export async function importZip(name: string, data: Buffer): Promise<string> {
 
 export async function wordCount(id: string, mainFile: string): Promise<WordCount> {
   const dir = resumeDir(id);
-  const res = await run("texcount", ["-inc", "-total", "-merge", "-utf8", "-sum=1,1,1", mainFile], { cwd: dir, timeoutMs: 30_000 });
-  if (res.error) throw new HttpError(503, "texcount isn't installed (it ships with TeX Live)");
+  let res: { stdout: string };
+  if (toolchainMode() === "service") {
+    // Counted on the compile service, in the same project the resume builds in.
+    const project = serviceProject(join(BUILD_DIR, id));
+    try {
+      await texService().sync(project, await serviceSources(dir));
+      res = await texService().texcount(project, mainFile);
+    } catch (e) {
+      if (e instanceof TexServiceError) throw new HttpError(503, e.message);
+      throw e;
+    }
+  } else {
+    const local = await run("texcount", ["-inc", "-total", "-merge", "-utf8", "-sum=1,1,1", mainFile], { cwd: dir, timeoutMs: 30_000 });
+    if (local.error) throw new HttpError(503, "texcount isn't installed (it ships with TeX Live)");
+    res = local;
+  }
   const num = (label: string) => Number(new RegExp(`${label}:\\s*(\\d+)`).exec(res.stdout)?.[1] ?? 0);
   const text = num("Words in text");
   const headers = num("Words in headers");
