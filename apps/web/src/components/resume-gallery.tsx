@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, FileText, Loader2, MoreHorizontal, Plus, Settings2, Sparkles, TriangleAlert, Upload } from "lucide-react";
+import { Check, Copy, FileText, Loader2, MoreHorizontal, Plus, Settings2, Sparkles, TriangleAlert, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -10,13 +10,30 @@ import { NewResumeDialog } from "@/components/new-resume-dialog";
 import { TailoringStrip } from "@/components/tailor/tailoring-strip";
 import { PdfThumb } from "@/components/preview/pdf-thumb";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type ResumeSummary } from "@/lib/api";
 import { relativeTime } from "@/lib/format";
-import type { SystemStatus } from "@/lib/types";
+import type { ApplicationStatus, SystemStatus } from "@/lib/types";
 import { useServerEvents } from "@/lib/use-events";
 import { cn } from "@/lib/utils";
+
+const APPLICATION_STATUS: { value: ApplicationStatus; label: string; cls: string }[] = [
+  { value: "draft", label: "Not applied yet", cls: "text-muted-foreground" },
+  { value: "applied", label: "Applied", cls: "text-primary" },
+  { value: "interviewing", label: "Interviewing", cls: "text-warning" },
+  { value: "offer", label: "Offer", cls: "text-success" },
+  { value: "rejected", label: "Rejected", cls: "text-destructive" },
+  { value: "withdrawn", label: "Withdrawn", cls: "text-muted-foreground" },
+];
 
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null) return null;
@@ -54,6 +71,15 @@ export function ResumeGallery() {
     } finally {
       setImporting(false);
       if (zipInput.current) zipInput.current.value = "";
+    }
+  };
+
+  const setStatus = async (r: ResumeSummary, status: ApplicationStatus) => {
+    try {
+      const meta = await api.update(r.id, { applicationStatus: status });
+      setResumes((list) => list?.map((x) => (x.id === r.id ? { ...x, application: meta.application } : x)) ?? list);
+    } catch (e) {
+      toast.error("Couldn't update the application", { description: (e as Error).message });
     }
   };
 
@@ -193,6 +219,11 @@ export function ResumeGallery() {
                         <span className="truncate">
                           {r.application.company} · {r.application.role}
                         </span>
+                        {r.application.status !== "draft" && (
+                          <span className={cn("ml-auto shrink-0 font-medium", APPLICATION_STATUS.find((x) => x.value === r.application!.status)?.cls)}>
+                            {APPLICATION_STATUS.find((x) => x.value === r.application!.status)?.label}
+                          </span>
+                        )}
                       </p>
                     )}
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -207,7 +238,7 @@ export function ResumeGallery() {
                     <DropdownMenuTrigger render={<Button variant="secondary" size="icon-xs" aria-label="Resume actions" className="shadow-sm" />}>
                       <MoreHorizontal />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="min-w-48">
                       <DropdownMenuItem onClick={() => router.push(`/tailor/new?resume=${encodeURIComponent(r.id)}`)}>
                         <Sparkles />
                         Tailor for a job…
@@ -217,6 +248,20 @@ export function ResumeGallery() {
                         <Copy />
                         Duplicate…
                       </DropdownMenuItem>
+                      {r.application && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuGroup>
+                            <DropdownMenuLabel>Application</DropdownMenuLabel>
+                            {APPLICATION_STATUS.map((st) => (
+                              <DropdownMenuItem key={st.value} onClick={() => void setStatus(r, st.value)}>
+                                <Check className={cn(r.application!.status === st.value ? "opacity-100" : "opacity-0")} />
+                                {st.label}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuGroup>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

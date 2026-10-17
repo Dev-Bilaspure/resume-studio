@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { body, handler, noStore } from "@/server/api";
+import { HttpError } from "@/server/fsutil";
+import type { ResumeMeta } from "@/lib/types";
 import { dropCompiler } from "@/server/compiler";
 import { emit } from "@/server/events";
 import { compilerFor } from "@/server/runtime";
@@ -24,11 +26,20 @@ const Patch = z.object({
   mainFile: z.string().min(1).optional(),
   trusted: z.boolean().optional(),
   haltOnError: z.boolean().optional(),
+  /** Where the application for a tailored resume stands. */
+  applicationStatus: z.enum(["draft", "applied", "interviewing", "offer", "rejected", "withdrawn"]).optional(),
 });
 
 export const PATCH = handler(async (req: Request, { params }: Ctx) => {
   const { id } = await params;
-  const meta = await updateResume(id, await body(req, Patch));
+  const { applicationStatus, ...patch } = await body(req, Patch);
+  let application: ResumeMeta["application"];
+  if (applicationStatus) {
+    const current = (await getResume(id)).application;
+    if (!current) throw new HttpError(400, "This resume wasn't tailored for a job");
+    application = { ...current, status: applicationStatus };
+  }
+  const meta = await updateResume(id, { ...patch, application });
   emit({ type: "resumes" });
   (await compilerFor(id)).schedule(true);
   return Response.json(meta);
