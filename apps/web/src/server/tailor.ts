@@ -2,7 +2,7 @@ import "server-only";
 import { copyFile, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { createLLM, type ProviderId } from "@resume-studio/llm";
+import { LLMError, createLLM, type ProviderId } from "@resume-studio/llm";
 import {
   createTailorEngine,
   type Answer,
@@ -124,7 +124,14 @@ function verifierFor(sessionId: string, resumeId: string, meta: ResumeMeta): Bui
 
 async function engineSetup(session: { id?: string; resumeId: string; provider?: ProviderId; model?: string }) {
   const meta = await getResume(session.resumeId);
-  const llm = createLLM(await resolveProvider(session.provider, session.model ? { model: session.model } : undefined));
+  let llm: ReturnType<typeof createLLM>;
+  try {
+    llm = createLLM(await resolveProvider(session.provider, session.model ? { model: session.model } : undefined));
+  } catch (e) {
+    // A provider that isn't set up (no key, no project) is a request problem, not a server error.
+    if (e instanceof LLMError) throw new HttpError(400, `${e.message}. Set it up under AI providers.`);
+    throw e;
+  }
   return {
     meta,
     llm,
