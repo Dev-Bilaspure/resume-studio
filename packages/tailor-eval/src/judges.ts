@@ -43,24 +43,25 @@ export async function auditTruthfulness(llm: LLM, original: string, tailored: st
   return res.data;
 }
 
-// ---- Blind recruiter screen --------------------------------------------------------------------------------
+// ---- Recruiter screen, one resume at a time ----------------------------------------------------------------
 
 export const ScreenSchema = z.object({
-  fitA: z.number().min(1).max(10).describe("How well resume A fits this role, 1–10"),
-  fitB: z.number().min(1).max(10).describe("How well resume B fits this role, 1–10"),
-  advance: z.enum(["A", "B"]).describe("If you could advance only one to a phone screen, which?"),
+  advance: z.boolean().describe("Would you advance this candidate to a phone screen for this role?"),
+  fit: z.number().min(1).max(10).describe("How well the resume fits this role, 1–10"),
+  shown: z.array(z.string()).describe("The posting's must-haves this resume clearly shows"),
+  missing: z.array(z.string()).describe("The posting's must-haves it doesn't show"),
   reason: z.string().describe("One or two sentences: what decided it"),
 });
 export type Screen = z.infer<typeof ScreenSchema>;
 
-const SCREEN_SYSTEM = `You are an experienced technical recruiter screening software engineering candidates for the role below. Hiring managers expect you to advance resumes that clearly show the role's must-have experience at the right level, in the posting's own terms, with concrete impact.
+const SCREEN_SYSTEM = `You are an experienced technical recruiter screening software engineering candidates for the role below. You see one resume. Hiring managers expect you to advance candidates whose resumes clearly show the role's must-have experience at the right level, with concrete impact, and to pass on the rest: phone screens are expensive, and most applicants for a role like this are not advanced.
 
-You get two resumes, A and B. Read each as you would in a real screen: quickly, looking for evidence of the requirements. Score each for fit (1–10), then pick the one you would advance if you could advance only one. Judge only what is written; don't reward length or formatting.`;
+Read the resume as you would in a real screen: quickly, looking for evidence of each requirement in the posting's terms. Judge only what is written; don't reward length or formatting, and don't assume experience the resume doesn't state.`;
 
-export async function screenPair(llm: LLM, posting: { company: string; role: string; description: string }, a: string, b: string, signal?: AbortSignal): Promise<Screen> {
+export async function screenOne(llm: LLM, posting: { company: string; role: string; description: string }, resume: string, signal?: AbortSignal): Promise<Screen> {
   const res = await llm.generate({
     system: SCREEN_SYSTEM,
-    prompt: `ROLE: ${posting.role} at ${posting.company}\n\nJOB POSTING:\n"""\n${posting.description.trim()}\n"""\n\nRESUME A:\n"""\n${a.trim()}\n"""\n\nRESUME B:\n"""\n${b.trim()}\n"""`,
+    prompt: `ROLE: ${posting.role} at ${posting.company}\n\nJOB POSTING:\n"""\n${posting.description.trim()}\n"""\n\nRESUME:\n"""\n${resume.trim()}\n"""`,
     schema: ScreenSchema,
     schemaName: "recruiter_screen",
     temperature: 0,

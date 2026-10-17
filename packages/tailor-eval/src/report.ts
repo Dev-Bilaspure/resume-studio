@@ -5,15 +5,18 @@ export interface Summary {
   cases: number;
   ready: number;
   failed: number;
-  /** Blind screens (two per case) where the tailored resume was the one advanced. */
-  screens: number;
+  /** Cases screened (both versions judged on their own). */
+  screened: number;
+  originalAdvanced: number;
   tailoredAdvanced: number;
-  /** Cases where both orders agreed on the tailored resume / on the original / split by position. */
-  tailoredWonBoth: number;
-  originalWonBoth: number;
-  splitByPosition: number;
-  /** Mean of (tailored fit − original fit), 1–10 scale, across all screens. */
+  /** Not advanced as written, advanced once tailored, and the reverse. */
+  gained: number;
+  lost: number;
+  /** Mean of (tailored fit − original fit), 1–10 scale. */
   meanFitDelta: number | null;
+  /** Mean number of the posting's must-haves the recruiter saw, before and after. */
+  meanShownBefore: number | null;
+  meanShownAfter: number | null;
   audit: { audited: number; clean: number; high: number; medium: number; low: number; byKind: Record<string, number> };
   pagesKept: number;
   meanSeconds: number | null;
@@ -24,19 +27,8 @@ const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.l
 
 export function summarize(results: CaseResult[]): Summary {
   const ready = results.filter((r) => r.status === "ready");
-  const screens = ready.flatMap((r) => r.screens ?? []);
-  const advanced = screens.filter((s) => s.result.advance === s.tailoredAs).length;
-  let both = 0;
-  let neither = 0;
-  let split = 0;
-  for (const r of ready) {
-    if (!r.screens || r.screens.length < 2) continue;
-    const wins = r.screens.filter((s) => s.result.advance === s.tailoredAs).length;
-    if (wins === 2) both++;
-    else if (wins === 0) neither++;
-    else split++;
-  }
-  const deltas = screens.map((s) => (s.tailoredAs === "A" ? s.result.fitA - s.result.fitB : s.result.fitB - s.result.fitA));
+  const screened = ready.filter((r) => r.screen);
+  const sc = screened.map((r) => r.screen!);
   const audited = ready.filter((r) => r.audit);
   const issues = audited.flatMap((r) => r.audit!.issues);
   const byKind: Record<string, number> = {};
@@ -45,12 +37,14 @@ export function summarize(results: CaseResult[]): Summary {
     cases: results.length,
     ready: ready.length,
     failed: results.length - ready.length,
-    screens: screens.length,
-    tailoredAdvanced: advanced,
-    tailoredWonBoth: both,
-    originalWonBoth: neither,
-    splitByPosition: split,
-    meanFitDelta: mean(deltas),
+    screened: sc.length,
+    originalAdvanced: sc.filter((s) => s.original.advance).length,
+    tailoredAdvanced: sc.filter((s) => s.tailored.advance).length,
+    gained: sc.filter((s) => !s.original.advance && s.tailored.advance).length,
+    lost: sc.filter((s) => s.original.advance && !s.tailored.advance).length,
+    meanFitDelta: mean(sc.map((s) => s.tailored.fit - s.original.fit)),
+    meanShownBefore: mean(sc.map((s) => s.original.shown.length)),
+    meanShownAfter: mean(sc.map((s) => s.tailored.shown.length)),
     audit: {
       audited: audited.length,
       clean: audited.filter((r) => !r.audit!.issues.some((i) => i.severity !== "low")).length,
@@ -67,6 +61,7 @@ export function summarize(results: CaseResult[]): Summary {
 
 const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : "–");
 const fix = (n: number | null, digits = 1) => (n === null ? "–" : n.toFixed(digits));
+const signed = (n: number | null, digits = 2) => (n === null ? "–" : `${n >= 0 ? "+" : ""}${n.toFixed(digits)}`);
 
 export function markdownReport(results: CaseResult[], meta: { engine: string; judge: string; startedAt: string }): string {
   const s = summarize(results);
@@ -75,36 +70,44 @@ export function markdownReport(results: CaseResult[], meta: { engine: string; ju
     ``,
     `Engine: ${meta.engine} · Judge: ${meta.judge} · Started ${meta.startedAt}`,
     ``,
+    `Each case tailors a resume for a real job posting. A recruiter judge then screens the original and the`,
+    `tailored version separately, each in a fresh context, and decides whether to advance it to a phone screen.`,
+    `A truthfulness audit compares the tailored text with the original.`,
+    ``,
     `## Summary`,
     ``,
     `| | |`,
     `|---|---|`,
     `| Cases | ${s.cases} (${s.ready} tailored, ${s.failed} failed) |`,
-    `| Blind screen: tailored advanced | ${s.tailoredAdvanced} of ${s.screens} screens (${pct(s.tailoredAdvanced, s.screens)}) |`,
-    `| …in both orders / original in both / split by position | ${s.tailoredWonBoth} / ${s.originalWonBoth} / ${s.splitByPosition} |`,
-    `| Mean fit change (1–10 scale) | ${s.meanFitDelta === null ? "–" : `${s.meanFitDelta >= 0 ? "+" : ""}${s.meanFitDelta.toFixed(2)}`} |`,
-    `| Truthfulness: resumes with no high/medium issue | ${s.audit.clean} of ${s.audit.audited} (${pct(s.audit.clean, s.audit.audited)}) |`,
+    `| Advanced to a phone screen: original → tailored | ${s.originalAdvanced} → ${s.tailoredAdvanced} of ${s.screened} (${pct(s.originalAdvanced, s.screened)} → ${pct(s.tailoredAdvanced, s.screened)}) |`,
+    `| Gained (not advanced → advanced) / lost | ${s.gained} / ${s.lost} |`,
+    `| Mean fit change (1–10) | ${signed(s.meanFitDelta)} |`,
+    `| Must-haves the recruiter saw (mean) | ${fix(s.meanShownBefore)} → ${fix(s.meanShownAfter)} |`,
+    `| Truthfulness: no high/medium issue | ${s.audit.clean} of ${s.audit.audited} (${pct(s.audit.clean, s.audit.audited)}) |`,
     `| Truthfulness issues (high / medium / low) | ${s.audit.high} / ${s.audit.medium} / ${s.audit.low} |`,
     `| Page count kept | ${s.pagesKept} of ${s.ready} |`,
     `| Mean time / model calls per case | ${fix(s.meanSeconds, 0)} s / ${fix(s.meanCalls)} |`,
     ``,
     `## Cases`,
     ``,
-    `| Case | Level | Status | Advanced (B, A) | Fit Δ | Audit (H/M/L) | Edits (dropped) | Keywords* | Strong reqs* | Pages | Time |`,
-    `|---|---|---|---|---|---|---|---|---|---|---|`,
+    `| Case | Level | Advanced (orig → tailored) | Fit | Must-haves seen | Audit (H/M/L) | Edits (dropped) | Pages | Time |`,
+    `|---|---|---|---|---|---|---|---|---|`,
   ];
   for (const r of results) {
-    const scr = r.screens ?? [];
-    const adv = scr.map((x) => (x.result.advance === x.tailoredAs ? "T" : "O")).join(", ") || "–";
-    const d = scr.length ? mean(scr.map((x) => (x.tailoredAs === "A" ? x.result.fitA - x.result.fitB : x.result.fitB - x.result.fitA))) : null;
+    const sc = r.screen;
     const a = r.audit?.issues ?? [];
     const sev = (v: string) => a.filter((i) => i.severity === v).length;
     const e = r.engine;
+    const yn = (b: boolean) => (b ? "yes" : "no");
     lines.push(
-      `| ${r.resume} → ${r.posting.company}: ${r.posting.role} | ${r.posting.level ?? ""} | ${r.status} | ${adv} | ${d === null ? "–" : (d >= 0 ? "+" : "") + d.toFixed(1)} | ${r.audit ? `${sev("high")}/${sev("medium")}/${sev("low")}` : "–"} | ${e.edits} (${e.dropped}) | ${e.keywordsBefore}→${e.keywordsAfter}/${e.keywordsTotal} | ${e.strongBefore}→${e.strongAfter}/${e.requirements} | ${e.pagesBefore ?? "–"}→${e.pagesAfter ?? "–"} | ${e.seconds}s |`,
+      `| ${r.resume} → ${r.posting.company}: ${r.posting.role} | ${r.posting.level ?? ""} | ${r.status !== "ready" ? r.status : sc ? `${yn(sc.original.advance)} → ${yn(sc.tailored.advance)}` : "–"} | ${sc ? `${sc.original.fit} → ${sc.tailored.fit}` : "–"} | ${sc ? `${sc.original.shown.length} → ${sc.tailored.shown.length}` : "–"} | ${r.audit ? `${sev("high")}/${sev("medium")}/${sev("low")}` : "–"} | ${e?.edits ?? "–"} (${e?.dropped ?? "–"}) | ${e?.pagesBefore ?? "–"}→${e?.pagesAfter ?? "–"} | ${e?.seconds ?? "–"}s |`,
     );
   }
-  lines.push(``, `T = the tailored resume was advanced, O = the original. *The engine's own measures, from its reading of the posting.`);
+  const flips = results.filter((r) => r.screen && r.screen.original.advance !== r.screen.tailored.advance);
+  if (flips.length) {
+    lines.push(``, `## Decisions that changed`, ``);
+    for (const r of flips) lines.push(`- **${r.id}** (${r.screen!.tailored.advance ? "gained" : "lost"}): original: ${r.screen!.original.reason} Tailored: ${r.screen!.tailored.reason}`);
+  }
   const flagged = results.flatMap((r) => (r.audit?.issues ?? []).filter((i) => i.severity !== "low").map((i) => ({ r, i })));
   if (flagged.length) {
     lines.push(``, `## Truthfulness issues (high and medium)`, ``);

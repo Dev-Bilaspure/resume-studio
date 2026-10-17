@@ -4,7 +4,7 @@ import { createTailorEngine, memoryFactStore, memorySessionStore, type Session }
 import { latexAdapter } from "@resume-studio/tailor-latex";
 import { latexmkVerifier } from "@resume-studio/tailor-latex/node";
 import { jobInput, type Case } from "./data.ts";
-import { auditTruthfulness, screenPair, type Audit, type Screen } from "./judges.ts";
+import { auditTruthfulness, screenOne, type Audit, type Screen } from "./judges.ts";
 
 export interface CaseResult {
   id: string;
@@ -36,8 +36,8 @@ export interface CaseResult {
     requirements: number;
   };
   audit?: Audit;
-  /** The blind screen, run in both orders (position bias): tailored as B, then as A. */
-  screens?: { tailoredAs: "A" | "B"; result: Screen }[];
+  /** Each version screened on its own, in a fresh context: would a recruiter advance it? */
+  screen?: { original: Screen; tailored: Screen };
   judge: { provider: string; model: string };
   finishedAt: string;
 }
@@ -108,14 +108,11 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
   if (s.status === "ready" && before && after) {
     deps.onStep?.("Auditing truthfulness");
     result.audit = await auditTruthfulness(deps.judgeLLM, before, after, deps.signal);
-    deps.onStep?.("Blind recruiter screen (tailored as B)");
-    const asB = await screenPair(deps.judgeLLM, c.posting, before, after, deps.signal);
-    deps.onStep?.("Blind recruiter screen (tailored as A)");
-    const asA = await screenPair(deps.judgeLLM, c.posting, after, before, deps.signal);
-    result.screens = [
-      { tailoredAs: "B", result: asB },
-      { tailoredAs: "A", result: asA },
-    ];
+    deps.onStep?.("Recruiter screen: original");
+    const original = await screenOne(deps.judgeLLM, c.posting, before, deps.signal);
+    deps.onStep?.("Recruiter screen: tailored");
+    const tailored = await screenOne(deps.judgeLLM, c.posting, after, deps.signal);
+    result.screen = { original, tailored };
   }
   result.finishedAt = new Date().toISOString();
   return result;
