@@ -45,7 +45,7 @@ export function SessionView({ id }: { id: string }) {
   }, load);
 
   // A fallback while work is in flight, in case an event is missed.
-  const working = !!session && (WORKING.has(session.status) || session.running);
+  const working = !!session && !session.interrupted && (WORKING.has(session.status) || session.running);
   useEffect(() => {
     if (!working) return;
     const t = setInterval(() => void load(), 5000);
@@ -117,7 +117,7 @@ export function SessionView({ id }: { id: string }) {
           <Review session={session} />
         ) : session.status === "needs_input" ? (
           <Questions session={session} onDone={load} />
-        ) : session.status === "failed" || session.status === "cancelled" ? (
+        ) : session.status === "failed" || session.status === "cancelled" || session.interrupted ? (
           <Stopped session={session} onRetry={load} />
         ) : (
           <Progress session={session} />
@@ -138,7 +138,7 @@ function StatusPill({ session }: { session: Session }) {
     failed: ["Failed", "bg-destructive/15 text-destructive"],
     cancelled: ["Cancelled", "bg-muted text-muted-foreground"],
   };
-  const [label, cls] = map[session.status] ?? [session.status, "bg-muted"];
+  const [label, cls] = session.interrupted ? ["Interrupted", "bg-warning/15 text-warning"] : (map[session.status] ?? [session.status, "bg-muted"]);
   return <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium", cls)}>{label}</span>;
 }
 
@@ -344,7 +344,19 @@ function Stopped({ session, onRetry }: { session: Session; onRetry(): void }) {
   const [busy, setBusy] = useState(false);
   const [settings, setSettings] = useState(false);
   const failed = session.status === "failed";
+  const interrupted = session.interrupted;
   const auth = session.error?.kind === "auth" || session.error?.kind === "config";
+  const cancel = async () => {
+    setBusy(true);
+    try {
+      await tailorApi.cancel(session.id);
+      onRetry();
+    } catch (e) {
+      toast.error("Couldn't cancel", { description: (e as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
   const retry = async () => {
     setBusy(true);
     try {
@@ -360,14 +372,27 @@ function Stopped({ session, onRetry }: { session: Session; onRetry(): void }) {
     <div className="flex h-full items-center justify-center px-6">
       <div className="w-full max-w-lg rounded-xl border bg-card p-6">
         <div className="flex items-start gap-3">
-          <CircleAlert className={cn("mt-0.5 size-5 shrink-0", failed ? "text-destructive" : "text-muted-foreground")} />
+          <CircleAlert className={cn("mt-0.5 size-5 shrink-0", failed ? "text-destructive" : interrupted ? "text-warning" : "text-muted-foreground")} />
           <div className="min-w-0">
-            <h2 className="font-semibold">{failed ? "Tailoring stopped with an error" : "Tailoring was cancelled"}</h2>
-            {session.error && <p className="mt-1 text-sm break-words text-muted-foreground">{session.error.message}</p>}
-            <p className="mt-3 text-xs text-muted-foreground">Retrying keeps the finished steps, so it doesn&apos;t start over.</p>
+            <h2 className="font-semibold">
+              {interrupted ? "Tailoring was interrupted" : failed ? "Tailoring stopped with an error" : "Tailoring was cancelled"}
+            </h2>
+            {interrupted ? (
+              <p className="mt-1 text-sm text-muted-foreground">Resume Studio was restarted while this was running.</p>
+            ) : (
+              failed && session.error && <p className="mt-1 text-sm break-words text-muted-foreground">{session.error.message}</p>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              {interrupted ? "Resuming" : "Retrying"} keeps the finished steps, so it doesn&apos;t start over.
+            </p>
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
+          {interrupted && (
+            <Button variant="ghost" disabled={busy} onClick={() => void cancel()}>
+              Discard
+            </Button>
+          )}
           {(auth || failed) && (
             <Button variant="outline" onClick={() => setSettings(true)}>
               <Settings2 />
@@ -376,7 +401,7 @@ function Stopped({ session, onRetry }: { session: Session; onRetry(): void }) {
           )}
           <Button disabled={busy} onClick={() => void retry()}>
             {busy ? <Loader2 className="animate-spin" /> : <RotateCcw />}
-            Retry
+            {interrupted ? "Resume" : "Retry"}
           </Button>
         </div>
       </div>

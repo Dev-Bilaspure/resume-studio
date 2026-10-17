@@ -48,9 +48,9 @@ export const aiApi = {
 // ---- Tailoring --------------------------------------------------------------------------------------------
 
 /** A session as the API returns it (no raw source or draft files). */
-export type SessionView = Omit<Session, "source" | "draft"> & { running: boolean };
+export type SessionView = Omit<Session, "source" | "draft"> & { running: boolean; interrupted: boolean };
 
-export type SessionSummary = Pick<Session, "id" | "status" | "createdAt" | "updatedAt" | "job" | "context">;
+export type SessionSummary = Pick<Session, "id" | "status" | "createdAt" | "updatedAt" | "job" | "context"> & { interrupted: boolean };
 
 export interface StartBody {
   resumeId: string;

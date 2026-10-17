@@ -153,12 +153,19 @@ const running = (g.__rsTailorRuns ??= new Map());
 
 async function runInBackground(sessionId: string) {
   if (running.has(sessionId)) return;
-  const s = await sessionStore.get(sessionId);
-  if (!s) throw new HttpError(404, "No such session");
-  const { make } = await engineSetup({ resumeId: s.context.resumeId, provider: s.context.provider as ProviderId, model: s.context.model });
-  const engine = make(sessionId);
+  // Registered before anything awaits: a page loading meanwhile must see it running, not interrupted.
   const ctl = new AbortController();
   running.set(sessionId, ctl);
+  let engine: ReturnType<Awaited<ReturnType<typeof engineSetup>>["make"]>;
+  try {
+    const s = await sessionStore.get(sessionId);
+    if (!s) throw new HttpError(404, "No such session");
+    const { make } = await engineSetup({ resumeId: s.context.resumeId, provider: s.context.provider as ProviderId, model: s.context.model });
+    engine = make(sessionId);
+  } catch (e) {
+    running.delete(sessionId);
+    throw e;
+  }
   void engine
     .run(sessionId, ctl.signal)
     .catch((e) => console.error("[tailor]", e))
@@ -189,19 +196,30 @@ export async function startTailoring(input: StartTailoring): Promise<Session> {
   return s;
 }
 
-export async function getSession(id: string): Promise<Session & { running: boolean }> {
+const WORKING = new Set<Session["status"]>(["created", "analyzing", "writing", "verifying"]);
+
+/**
+ * A session that says it's working while nothing runs it was cut off (the app restarted mid-run). It
+ * resumes from its last finished step when you ask (retrySession); it isn't restarted on its own, since
+ * that would spend model usage without you asking.
+ */
+const isInterrupted = (s: Session) => WORKING.has(s.status) && !running.has(s.id);
+
+export async function getSession(id: string): Promise<Session & { running: boolean; interrupted: boolean }> {
   const s = await sessionStore.get(id);
   if (!s) throw new HttpError(404, "No such tailoring session");
-  return { ...s, running: running.has(id) };
+  return { ...s, running: running.has(id), interrupted: isInterrupted(s) };
 }
 
-export async function listSessions(resumeId?: string): Promise<Pick<Session, "id" | "status" | "createdAt" | "updatedAt" | "job" | "context">[]> {
+export async function listSessions(
+  resumeId?: string,
+): Promise<(Pick<Session, "id" | "status" | "createdAt" | "updatedAt" | "job" | "context"> & { interrupted: boolean })[]> {
   const files = await readdir(SESSIONS_DIR).catch(() => [] as string[]);
   const out = [];
   for (const f of files.filter((x) => x.endsWith(".json"))) {
     const s = await sessionStore.get(f.replace(/\.json$/, ""));
     if (!s || (resumeId && s.context.resumeId !== resumeId)) continue;
-    out.push({ id: s.id, status: s.status, createdAt: s.createdAt, updatedAt: s.updatedAt, job: s.job, context: s.context });
+    out.push({ id: s.id, status: s.status, createdAt: s.createdAt, updatedAt: s.updatedAt, job: s.job, context: s.context, interrupted: isInterrupted(s) });
   }
   return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
@@ -224,8 +242,17 @@ export async function retrySession(id: string) {
   await runInBackground(id);
 }
 
-export function cancelSession(id: string) {
-  running.get(id)?.abort();
+export async function cancelSession(id: string) {
+  const ctl = running.get(id);
+  if (ctl) return ctl.abort();
+  // Nothing running it (interrupted): mark it cancelled directly.
+  const s = await sessionStore.get(id);
+  if (s && WORKING.has(s.status)) {
+    s.status = "cancelled";
+    s.updatedAt = new Date().toISOString();
+    await sessionStore.put(s);
+    emit({ type: "tailor", sessionId: id, resumeId: s.context.resumeId, status: s.status, message: "Cancelled" });
+  }
 }
 
 /** Builds a draft with only these edits, for the review screen. Returns the preview's id. */

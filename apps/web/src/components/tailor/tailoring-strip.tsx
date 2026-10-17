@@ -50,7 +50,11 @@ export function TailoringStrip({ savedSessions }: { savedSessions: Set<string> }
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-3">
         {shown.map((s) => {
           const saved = savedSessions.has(s.id);
-          const st = saved ? { label: "Saved as a resume", cls: "text-muted-foreground" } : (STATE[s.status] ?? { label: s.status, cls: "" });
+          const st = saved
+            ? { label: "Saved as a resume", cls: "text-muted-foreground" }
+            : s.interrupted
+              ? { label: "Interrupted", cls: "text-warning" }
+              : (STATE[s.status] ?? { label: s.status, cls: "" });
           return (
             <li key={s.id}>
               <Link
