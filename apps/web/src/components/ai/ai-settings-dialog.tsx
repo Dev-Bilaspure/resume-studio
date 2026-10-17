@@ -30,7 +30,7 @@ export function AiSettingsDialog({ open, onOpenChange, initialProvider, onSaved 
         <DialogHeader className="border-b px-5 py-4">
           <DialogTitle>AI provider</DialogTitle>
           <DialogDescription>
-            Tailoring runs on the model you pick here. Keys are stored in the macOS Keychain, never in files or the browser.
+            Tailoring runs on the model you pick here. Keys stay on this computer (in the macOS Keychain; on Linux and Windows, in a file only you can read) and never reach the browser.
           </DialogDescription>
         </DialogHeader>
         {/* Mounted per opening, so unsaved edits don't linger. */}
@@ -224,7 +224,7 @@ function ProviderForm({ info, saved, isDefault, onSaved }: { info: ProviderInfo;
               {f.required && <span className="text-muted-foreground">*</span>}
               {f.secret && secretSet(f.key) && (
                 <span className="ml-auto flex items-center gap-2 text-[11px] font-normal text-success">
-                  <Check className="size-3" /> Saved in Keychain
+                  <Check className="size-3" /> Saved
                   <button
                     type="button"
                     className="text-muted-foreground underline-offset-2 hover:text-destructive hover:underline"
