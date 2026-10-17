@@ -5,6 +5,8 @@ import { dirname, join } from "node:path";
 import { LLMError, createLLM, type ProviderId } from "@resume-studio/llm";
 import {
   createTailorEngine,
+  jobCompany,
+  jobTitle,
   type Answer,
   type BuildCheck,
   type BuildVerifier,
@@ -122,16 +124,19 @@ function verifierFor(sessionId: string, resumeId: string, meta: ResumeMeta): Bui
   }
 }
 
-async function engineSetup(session: { id?: string; resumeId: string; provider?: ProviderId; model?: string }) {
-  const meta = await getResume(session.resumeId);
-  let llm: ReturnType<typeof createLLM>;
+/** A model client for a provider (the default one when not given), with a clear error when it isn't set up. */
+export async function llmFor(provider?: ProviderId, model?: string) {
   try {
-    llm = createLLM(await resolveProvider(session.provider, session.model ? { model: session.model } : undefined));
+    return createLLM(await resolveProvider(provider, model ? { model } : undefined));
   } catch (e) {
-    // A provider that isn't set up (no key, no project) is a request problem, not a server error.
     if (e instanceof LLMError) throw new HttpError(400, `${e.message}. Set it up under AI providers.`);
     throw e;
   }
+}
+
+async function engineSetup(session: { id?: string; resumeId: string; provider?: ProviderId; model?: string }) {
+  const meta = await getResume(session.resumeId);
+  const llm = await llmFor(session.provider, session.model);
   return {
     meta,
     llm,
@@ -288,7 +293,7 @@ export async function finalizeSession(id: string, accepted: string[], name: stri
   const created = await createResume({ name, duplicateOf: s.context.resumeId });
   const dir = resumeDir(created.id);
   for (const [path, text] of Object.entries(source.files)) await atomicWrite(join(dir, path), text);
-  await atomicWrite(join(dir, "jd.md"), `# ${s.job.role} — ${s.job.company}\n\n${s.job.link ? `${s.job.link}\n\n` : ""}${s.job.description.trim()}\n`);
+  await atomicWrite(join(dir, "jd.md"), `# ${jobTitle(s.job)} — ${jobCompany(s.job)}\n\n${s.job.link ? `${s.job.link}\n\n` : ""}${s.job.description.trim()}\n`);
   await atomicWrite(
     join(dir, "tailor.json"),
     JSON.stringify(
@@ -316,8 +321,8 @@ export async function finalizeSession(id: string, accepted: string[], name: stri
   );
   const meta = await updateResume(created.id, {
     application: {
-      company: s.job.company,
-      role: s.job.role,
+      company: jobCompany(s.job),
+      role: jobTitle(s.job),
       link: s.job.link,
       baseResume: s.context.resumeId,
       session: s.id,
@@ -326,8 +331,8 @@ export async function finalizeSession(id: string, accepted: string[], name: stri
     },
   });
   await createSnapshot(created.id, {
-    message: `Tailored for ${s.job.company}: ${s.job.role}`,
-    label: slugify(`${s.job.company}-${s.job.role}`).slice(0, 50),
+    message: `Tailored for ${jobCompany(s.job)}: ${jobTitle(s.job)}`,
+    label: slugify(`${s.job.company || "job"}-${jobTitle(s.job)}`).slice(0, 50),
   }).catch(() => null);
   emit({ type: "resumes" });
   // The build folders served the review; reopening it rebuilds what it needs.

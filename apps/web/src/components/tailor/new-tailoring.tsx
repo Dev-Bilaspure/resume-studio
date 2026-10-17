@@ -2,7 +2,7 @@
 
 import { ArrowRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PdfThumb } from "@/components/preview/pdf-thumb";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { api, type ResumeSummary } from "@/lib/api";
 import { tailorApi } from "@/lib/tailor-api";
+import { cn } from "@/lib/utils";
 import { FactsDialog } from "./facts-dialog";
 import { ModelPicker, type ModelChoice } from "./model-picker";
 import { TailorHeader } from "./tailor-header";
@@ -97,11 +98,81 @@ export function NewTailoring({ resumeId }: { resumeId: string | null }) {
   const baseResume = resumes?.find((r) => r.id === base);
   const descLength = job.description.trim().length;
   const problems = {
-    company: !job.company.trim() && "Company is required",
-    role: !job.role.trim() && "The exact title from the posting",
-    description: descLength < 80 && (descLength ? "That looks short. Paste the whole posting." : "Paste the job description"),
+    description: descLength < 80 && (descLength ? "That looks short. Paste the whole posting." : "Paste the job posting"),
   };
-  const valid = !!base && !problems.company && !problems.role && !problems.description && !!model;
+  const valid = !!base && !problems.description && !!model;
+
+  // Paste the posting, and the details fill themselves in: only empty fields, never what you typed.
+  const [reading, setReading] = useState(false);
+  const [filled, setFilled] = useState<Set<"company" | "role" | "seniority" | "location">>(new Set());
+  const lastRead = useRef("");
+  // The posting states no title, so the one filled in is a suggestion.
+  const [roleSuggested, setRoleSuggested] = useState(false);
+  const jobRef = useRef(job);
+  useEffect(() => {
+    jobRef.current = job;
+  });
+  const description = job.description.trim();
+  useEffect(() => {
+    if (description.length < 200 || description === lastRead.current || !model) return;
+    const ctl = new AbortController();
+    const t = setTimeout(() => {
+      lastRead.current = description;
+      setReading(true);
+      tailorApi
+        .readPosting({ description, provider: model.provider, model: model.model }, ctl.signal)
+        .then((d) => {
+          // What you've typed by the time the answer arrives wins.
+          const j = jobRef.current;
+          const next = { ...j };
+          const got = new Set<"company" | "role" | "seniority" | "location">();
+          const title = d.role ?? d.suggestedRole;
+          if (!j.company.trim() && d.company) {
+            next.company = d.company;
+            got.add("company");
+          }
+          if (!j.role.trim() && title) {
+            next.role = title;
+            got.add("role");
+          }
+          setRoleSuggested(!d.role);
+          if (j.seniority === "auto" && d.seniority) {
+            next.seniority = d.seniority;
+            got.add("seniority");
+          }
+          if (!j.location.trim() && d.location) {
+            next.location = d.location;
+            got.add("location");
+          }
+          setJob(next);
+          setFilled(got);
+        })
+        .catch(() => {
+          // Best effort: the fields stay as they are, and the engine reads the posting anyway.
+        })
+        .finally(() => {
+          if (!ctl.signal.aborted) setReading(false);
+        });
+    }, 800);
+    return () => {
+      clearTimeout(t);
+      ctl.abort();
+    };
+  }, [description, model]);
+  const fromPosting = (k: "company" | "role" | "seniority" | "location") =>
+    filled.has(k) ? (
+      <span className={cn("ml-auto text-[11px] font-normal", k === "role" && roleSuggested ? "text-warning" : "text-primary")}>
+        {k === "role" && roleSuggested ? "suggested: the posting names no title" : "from the posting"}
+      </span>
+    ) : null;
+  const edit = <K extends "company" | "role" | "location">(k: K, v: string) => {
+    set(k, v);
+    setFilled((f) => {
+      const n = new Set(f);
+      n.delete(k);
+      return n;
+    });
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,36 +226,61 @@ export function NewTailoring({ resumeId }: { resumeId: string | null }) {
           </div>
 
           <section className="grid gap-4 rounded-xl border bg-card p-5">
+            <div className="grid gap-1.5">
+              <Label htmlFor="jd" className="flex items-center">
+                Job posting
+                <span className="ml-auto text-[11px] font-normal text-muted-foreground tabular-nums">
+                  {descLength ? `${descLength.toLocaleString()} characters` : ""}
+                </span>
+              </Label>
+              <Textarea
+                id="jd"
+                autoFocus
+                value={job.description}
+                onChange={(e) => set("description", e.target.value)}
+                placeholder="Paste the whole posting, as the company gives it: the role, responsibilities, requirements. Boilerplate is fine; it's ignored."
+                className="max-h-[22rem] min-h-64 overflow-y-auto text-sm leading-relaxed"
+                aria-invalid={touched && !!problems.description}
+              />
+              {err("description")}
+            </div>
+
+            <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Details</span>
+              {reading ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 className="size-3 animate-spin" /> Reading the posting…
+                </span>
+              ) : (
+                <span>Filled in from the posting when you paste it. Edit anything; all optional.</span>
+              )}
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-1.5">
-                <Label htmlFor="company">Company</Label>
-                <Input
-                  id="company"
-                  autoFocus
-                  value={job.company}
-                  onChange={(e) => set("company", e.target.value)}
-                  placeholder="Stripe"
-                  aria-invalid={touched && !!problems.company}
-                />
-                {err("company")}
+                <Label htmlFor="company" className="flex items-center">
+                  Company {fromPosting("company")}
+                </Label>
+                <Input id="company" value={job.company} onChange={(e) => edit("company", e.target.value)} placeholder="Not named in the posting" />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="role">Role, exactly as posted</Label>
-                <Input
-                  id="role"
-                  value={job.role}
-                  onChange={(e) => set("role", e.target.value)}
-                  placeholder="Backend Engineer, Payments Platform"
-                  aria-invalid={touched && !!problems.role}
-                />
-                {err("role")}
+                <Label htmlFor="role" className="flex items-center">
+                  Role {fromPosting("role")}
+                </Label>
+                <Input id="role" value={job.role} onChange={(e) => edit("role", e.target.value)} placeholder="Read from the posting" />
               </div>
               <div className="grid gap-1.5">
-                <Label>Level</Label>
+                <Label className="flex items-center">Level {fromPosting("seniority")}</Label>
                 <Select
                   items={SENIORITY.map((s) => ({ value: s.value, label: s.label }))}
                   value={job.seniority}
-                  onValueChange={(v) => set("seniority", v as Draft["seniority"])}
+                  onValueChange={(v) => {
+                    set("seniority", v as Draft["seniority"]);
+                    setFilled((f) => {
+                      const n = new Set(f);
+                      n.delete("seniority");
+                      return n;
+                    });
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -199,39 +295,20 @@ export function NewTailoring({ resumeId }: { resumeId: string | null }) {
                 </Select>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="location">
-                  Location <span className="font-normal text-muted-foreground">(optional)</span>
+                <Label htmlFor="location" className="flex items-center">
+                  Location {fromPosting("location")}
                 </Label>
-                <Input id="location" value={job.location} onChange={(e) => set("location", e.target.value)} placeholder="Remote (US), or San Francisco" />
+                <Input id="location" value={job.location} onChange={(e) => edit("location", e.target.value)} placeholder="Remote (US), or Bangalore" />
               </div>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="link">
-                Link to the posting <span className="font-normal text-muted-foreground">(optional, kept with the tailored resume)</span>
+                Link to the posting <span className="font-normal text-muted-foreground">(kept with the tailored resume)</span>
               </Label>
               <Input id="link" type="url" value={job.link} onChange={(e) => set("link", e.target.value)} placeholder="https://…" />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="jd" className="flex items-center">
-                Job description
-                <span className="ml-auto text-[11px] font-normal text-muted-foreground tabular-nums">
-                  {descLength ? `${descLength.toLocaleString()} characters` : ""}
-                </span>
-              </Label>
-              <Textarea
-                id="jd"
-                value={job.description}
-                onChange={(e) => set("description", e.target.value)}
-                placeholder="Paste the whole posting: about the team, responsibilities, requirements, nice-to-haves."
-                className="min-h-64 text-sm leading-relaxed"
-                aria-invalid={touched && !!problems.description}
-              />
-              {err("description")}
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="notes">
-                Anything to emphasize or play down? <span className="font-normal text-muted-foreground">(optional)</span>
-              </Label>
+              <Label htmlFor="notes">Anything to emphasize or play down?</Label>
               <Textarea
                 id="notes"
                 value={job.notes}

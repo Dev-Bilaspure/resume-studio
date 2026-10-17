@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
-import { editContext, elementText, plainText, tailorApi, wordDiff, type PreviewResult, type SessionView } from "@/lib/tailor-api";
+import { editContext, elementText, jobTitle, plainText, tailorApi, wordDiff, type PreviewResult, type SessionView } from "@/lib/tailor-api";
 import { cn } from "@/lib/utils";
 import { FactsDialog } from "./facts-dialog";
 import { MatchDot } from "./session-view";
@@ -40,7 +40,7 @@ export function Review({ session }: { session: SessionView }) {
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [originalPdf, setOriginalPdf] = useState<string | null>(null);
-  const [name, setName] = useState(`${session.context.resumeName ?? "Resume"} · ${session.job.company}`);
+  const [name, setName] = useState(`${session.context.resumeName ?? "Resume"} · ${session.job.company || jobTitle(session.job)}`);
   const [saving, setSaving] = useState(false);
   const [factsOpen, setFactsOpen] = useState(false);
   const facts: Fact[] = useMemo(() => [...session.facts, ...session.newFacts], [session.facts, session.newFacts]);

@@ -4,7 +4,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { relativeTime } from "@/lib/format";
-import { tailorApi, type SessionSummary } from "@/lib/tailor-api";
+import { jobCompany, jobTitle, tailorApi, type SessionSummary } from "@/lib/tailor-api";
 import { useServerEvents } from "@/lib/use-events";
 import { cn } from "@/lib/utils";
 
@@ -61,8 +61,8 @@ export function TailoringStrip({ savedSessions }: { savedSessions: Set<string> }
                 href={`/tailor/${s.id}`}
                 className="block rounded-xl border bg-card px-4 py-3 transition-colors hover:border-primary/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
               >
-                <p className="truncate text-sm font-medium">{s.job.company}</p>
-                <p className="truncate text-xs text-muted-foreground">{s.job.role}</p>
+                <p className="truncate text-sm font-medium">{jobCompany(s.job)}</p>
+                <p className="truncate text-xs text-muted-foreground">{jobTitle(s.job)}</p>
                 <p className="mt-2 flex items-center gap-1.5 text-[11px]">
                   {"busy" in st && st.busy && <Loader2 className="size-3 animate-spin text-primary" />}
                   <span className={cn("font-medium", st.cls)}>{st.label}</span>

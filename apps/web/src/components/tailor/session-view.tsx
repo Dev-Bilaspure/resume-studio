@@ -8,7 +8,7 @@ import { AiSettingsDialog } from "@/components/ai/ai-settings-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDuration } from "@/lib/format";
-import { tailorApi, type SessionView as Session } from "@/lib/tailor-api";
+import { jobCompany, jobTitle, tailorApi, type SessionView as Session } from "@/lib/tailor-api";
 import { useServerEvents } from "@/lib/use-events";
 import { cn } from "@/lib/utils";
 import { Review } from "./review";
@@ -76,7 +76,7 @@ export function SessionView({ id }: { id: string }) {
     );
   }
 
-  const title = `${session.job.role} · ${session.job.company}`;
+  const title = `${jobTitle(session.job)} · ${jobCompany(session.job)}`;
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
       <TailorHeader

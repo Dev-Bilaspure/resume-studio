@@ -10,8 +10,8 @@ export const GET = handler(async (req: Request) => {
 const Start = z.object({
   resumeId: z.string().min(1),
   job: z.object({
-    company: z.string().trim().min(1, "Company is required").max(200),
-    role: z.string().trim().min(1, "Role is required").max(200),
+    company: z.string().trim().max(200).default(""),
+    role: z.string().trim().max(200).default(""),
     seniority: z.enum(["intern", "junior", "mid", "senior", "staff", "principal", "manager"]).optional(),
     description: z.string().trim().min(80, "Paste the full job description").max(60_000),
     location: z.string().max(200).optional(),

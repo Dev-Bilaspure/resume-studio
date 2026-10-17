@@ -1,11 +1,12 @@
 "use client";
 
 import type { ProviderField, ProviderId, ProviderInfo } from "@resume-studio/llm";
-import type { Answer, EditOp, Fact, JobInput, ResumeDoc, Session, TailorOptions } from "@resume-studio/tailor";
+import type { Answer, EditOp, Fact, JobInput, PostingDetails, ResumeDoc, Session, TailorOptions } from "@resume-studio/tailor";
 import { ApiError } from "./api";
 import type { ResumeMeta } from "./types";
 
 export type { ProviderField, ProviderId, ProviderInfo };
+export { jobCompany, jobTitle } from "@resume-studio/tailor/job";
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, headers: init?.body ? { "Content-Type": "application/json" } : undefined });
@@ -78,6 +79,8 @@ export const tailorApi = {
   cancel: (id: string) => req<void>(`${s(id)}/cancel`, post({})),
   preview: (id: string, accepted: string[], signal?: AbortSignal) => req<PreviewResult>(`${s(id)}/preview`, { ...post({ accepted }), signal }),
   finalize: (id: string, accepted: string[], name: string) => req<ResumeMeta>(`${s(id)}/finalize`, post({ accepted, name })),
+  readPosting: (body: { description: string; provider?: ProviderId; model?: string }, signal?: AbortSignal) =>
+    req<PostingDetails>("/api/tailor/read-posting", { ...post(body), signal }),
   facts: () => req<{ facts: Fact[] }>("/api/facts"),
   saveFacts: (facts: Fact[]) => req<void>("/api/facts", { method: "PUT", body: JSON.stringify({ facts }) }),
 };
