@@ -3,15 +3,15 @@
 //     [--seniority mid] [--provider claude-code] [--model opus] [--out tailored.tex] [--sessions dir]
 // Gap questions are answered from --answers "topic=what you did;…" (matched against each question's topic
 // and text); the rest are answered "I don't have this".
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { join, relative } from "node:path";
 import { parseArgs } from "node:util";
 import { createLLM, type ProviderId } from "@resume-studio/llm";
-import { createTailorEngine, type BuildVerifier, type Seniority, type SourceFiles } from "@resume-studio/tailor";
+import { createTailorEngine, type Seniority } from "@resume-studio/tailor";
 import { fileSessionStore } from "@resume-studio/tailor/node";
 import { latexAdapter } from "@resume-studio/tailor-latex";
+import { latexmkVerifier } from "@resume-studio/tailor-latex/node";
 
 const { values: opt, positionals } = parseArgs({
   allowPositionals: true,
@@ -47,38 +47,8 @@ const walk = (d: string) => {
 };
 walk(dir);
 
-const PATH = `/Library/TeX/texbin:/opt/homebrew/bin:${process.env.PATH}`;
-const verifier: BuildVerifier = {
-  async build(source: SourceFiles, { maxPages }) {
-    const work = mkdtempSync(join(tmpdir(), "tailor-build-"));
-    try {
-      for (const [f, t] of Object.entries(source.files)) {
-        mkdirSync(dirname(join(work, f)), { recursive: true });
-        writeFileSync(join(work, f), t);
-      }
-      const engine = /fontspec/.test(source.files[source.main]) ? "-xelatex" : "-pdf";
-      try {
-        execFileSync("latexmk", [engine, "-interaction=nonstopmode", "-file-line-error", "-halt-on-error", source.main], { cwd: work, env: { ...process.env, PATH }, stdio: "pipe" });
-      } catch {
-        const log = readFileSync(join(work, source.main.replace(/\.tex$/, ".log")), "utf8");
-        const errors = [...log.matchAll(/^(\.\/[^:]+):(\d+): (.*)$/gm)].map((m) => ({ file: m[1].slice(2), line: Number(m[2]), message: m[3] }));
-        return { ok: false, pages: null, errors };
-      }
-      const pdf = join(work, source.main.replace(/\.tex$/, ".pdf"));
-      const pages = Number(/Pages:\s+(\d+)/.exec(execFileSync("pdfinfo", [pdf], { env: { ...process.env, PATH } }).toString())?.[1]);
-      const text = execFileSync("pdftotext", ["-enc", "UTF-8", pdf, "-"], { env: { ...process.env, PATH } }).toString();
-      let overflowLines: number | undefined;
-      if (maxPages && pages > maxPages) {
-        const extra = execFileSync("pdftotext", ["-f", String(maxPages + 1), "-l", String(pages), "-enc", "UTF-8", pdf, "-"], { env: { ...process.env, PATH } }).toString();
-        overflowLines = extra.split("\n").filter((l) => l.trim()).length;
-      }
-      return { ok: true, pages, text, overflowLines, errors: [] };
-    } finally {
-      rmSync(work, { recursive: true, force: true });
-    }
-  },
-  editAt: (draft, err) => latexAdapter.editAt(draft, err),
-};
+// Compiled with the local TeX installation; the resume folder's other files (images, fonts) come along.
+const verifier = latexmkVerifier({ assetsDir: dir });
 
 const t0 = Date.now();
 const engine = createTailorEngine({
