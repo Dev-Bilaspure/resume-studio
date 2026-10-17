@@ -102,6 +102,7 @@ test("every proposed edit is accounted for: kept, repaired or shown as dropped",
   const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
   const s = await engine.run(s0.id);
   assert.equal(s.status, "ready", s.error?.message);
+  assert.deepEqual(s.fit && [s.fit.level, s.fit.must.total, s.fit.gaps], ["long-shot", 1, ["Kubernetes"]], "the fit is assessed from the matching");
   const byTarget = Object.fromEntries((s.edits ?? []).map((e) => [`${e.change.op}:${e.change.target}:${e.status}`, e]));
   assert.deepEqual(Object.keys(byTarget).sort(), ["remove_bullet:b3:ok", "rewrite_bullet:b1:dropped", "rewrite_bullet:b2:ok", "set_headline:h1:ok"].sort());
   assert.match(byTarget["rewrite_bullet:b2:ok"].issues!.join(), /Revised after the fact-check: “Led a platform team”/);

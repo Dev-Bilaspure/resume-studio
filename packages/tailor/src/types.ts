@@ -130,6 +130,20 @@ export interface RequirementMatch {
   note: string;
 }
 
+// ---- Fit -----------------------------------------------------------------------------------------------
+
+export type FitLevel = "strong" | "stretch" | "long-shot";
+
+export interface FitAssessment {
+  level: FitLevel;
+  /** Must-have requirements: clearly shown, partly shown, not shown. */
+  must: { strong: number; weak: number; missing: number; total: number };
+  /** Must-haves the resume doesn't show at all, as written in the posting. */
+  gaps: string[];
+  /** A missing must-have about years of experience or a degree: hard to argue past. */
+  hardGap: boolean;
+}
+
 export interface Question {
   id: string; // "q1"
   requirementId: string;
@@ -230,6 +244,8 @@ export interface Session {
   doc?: ResumeDoc;
   profile?: JobProfile;
   matches?: RequirementMatch[];
+  /** How well the resume fits the job before rewriting, from the matching (see assessFit). */
+  fit?: FitAssessment;
   questions?: Question[];
   answers?: Answer[];
   facts: Fact[];

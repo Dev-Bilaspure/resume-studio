@@ -20,6 +20,7 @@ import {
   PostingSchema,
   postingPrompt,
 } from "./prompts.ts";
+import { assessFit } from "./fit.ts";
 import { coverage, uid } from "./text.ts";
 import type { Answer, BuildCheck, Edit, Fact, JobInput, JobProfile, Report, Session, SessionStatus, SourceFiles, TailorEvent, TailorOptions } from "./types.ts";
 import { beforeText, checkEdits, entryHeading, evidenceText, indexDoc, toEdit } from "./verify.ts";
@@ -385,6 +386,7 @@ export function createTailorEngine(deps: EngineDeps) {
           await match(s, signal);
           await save(s);
         }
+        if (!s.fit) s.fit = assessFit(s.profile!, s.matches!);
         if (s.questions?.length && !s.answers) {
           s.report = { before: { ...coverage(beforeCheck?.text ?? docText(s.doc), s.profile!.keywords, s.matches!), build: beforeCheck }, after: { ...coverage("", [], []) }, strategy: "", warnings: [] };
           await save(s, "needs_input");
