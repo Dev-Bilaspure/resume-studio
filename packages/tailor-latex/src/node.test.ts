@@ -68,3 +68,15 @@ test("resume folders: read the main file, write a new folder, never over the ori
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("font substitution touches font arguments only", async () => {
+  const { substituteFont } = await import("./node.ts");
+  const out = substituteFont(
+    { "main.tex": "\\setmainfont{Arial}\n\\setsansfont[Scale=0.9]{ Arial }\n\\newfontfamily\\heading{Arial}\nArial is a font.\n\\setmainfont{Arial Black}", "cv.cls": "\\fontspec{Arial}", "refs.bib": "\\setmainfont{Arial}" },
+    "Arial",
+    "Liberation Sans",
+  );
+  assert.equal(out["main.tex"], "\\setmainfont{Liberation Sans}\n\\setsansfont[Scale=0.9]{ Liberation Sans }\n\\newfontfamily\\heading{Liberation Sans}\nArial is a font.\n\\setmainfont{Arial Black}");
+  assert.equal(out["cv.cls"], "\\fontspec{Liberation Sans}");
+  assert.equal(out["refs.bib"], "\\setmainfont{Arial}", "only TeX files");
+});

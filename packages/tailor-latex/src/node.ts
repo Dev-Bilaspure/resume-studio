@@ -41,6 +41,28 @@ export function latexEngine(source: SourceFiles): "-pdf" | "-xelatex" | "-lualat
   return /\\(usepackage|RequirePackage)(\[[^\]]*\])?\{[^}]*\b(fontspec|unicode-math|polyglossia)\b/.test(all) ? "-xelatex" : "-pdf";
 }
 
+/** Free fonts with the same character widths as common commercial ones: same line breaks, same page count. */
+export const METRIC_COMPATIBLE: Record<string, string> = {
+  Arial: "Liberation Sans",
+  Helvetica: "Liberation Sans",
+  "Helvetica Neue": "Liberation Sans",
+  "Times New Roman": "Liberation Serif",
+  Times: "Liberation Serif",
+  "Courier New": "Liberation Mono",
+  Calibri: "Carlito",
+  Cambria: "Caladea",
+};
+
+/** Replaces a font name where fontspec takes one (\setmainfont, \newfontfamily, \fontspec…), in every file. */
+export function substituteFont(files: Record<string, string>, from: string, to: string): Record<string, string> {
+  const name = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(\\\\(?:setmainfont|setsansfont|setmonofont|setmathfont|fontspec|newfontfamily\\s*\\\\[A-Za-z@]+|newfontface\\s*\\\\[A-Za-z@]+|setfontfamily\\s*\\\\[A-Za-z@]+)\\s*(?:\\[[^\\]]*\\]\\s*)?\\{\\s*)${name}(\\s*\\})`, "g");
+  return Object.fromEntries(Object.entries(files).map(([p, t]) => [p, /\.(tex|cls|sty)$/.test(p) ? t.replace(re, `$1${to}$2`) : t]));
+}
+
+/** Fonts this machine turned out not to have (for the life of the process). */
+const missingFonts = new Set<string>();
+
 export function latexmkVerifier(options: LatexmkOptions = {}): BuildVerifier {
   const timeoutMs = options.timeoutMs ?? 120_000;
   return {
@@ -48,13 +70,35 @@ export function latexmkVerifier(options: LatexmkOptions = {}): BuildVerifier {
       const work = mkdtempSync(join(tmpdir(), "tailor-build-"));
       try {
         if (options.assetsDir && existsSync(options.assetsDir)) cpSync(options.assetsDir, work, { recursive: true });
-        for (const [path, text] of Object.entries(source.files)) {
-          mkdirSync(dirname(join(work, path)), { recursive: true });
-          writeFileSync(join(work, path), text);
-        }
-        const tex = await run("latexmk", [latexEngine(source), "-interaction=nonstopmode", "-file-line-error", "-halt-on-error", "-norc", source.main], { cwd: work, timeoutMs, signal });
+        const write = (files: Record<string, string>) => {
+          for (const [path, text] of Object.entries(files)) {
+            mkdirSync(dirname(join(work, path)), { recursive: true });
+            writeFileSync(join(work, path), text);
+          }
+        };
+        // Fonts already known to be missing here are swapped up front: looking one up and failing takes
+        // fontspec ~10 s on a full TeX Live (it searches every installed font).
+        let files = source.files;
+        for (const f of missingFonts) files = substituteFont(files, f, METRIC_COMPATIBLE[f]);
+        write(files);
         const base = source.main.replace(/\.[^.]+$/, "");
         const pdf = join(work, `${base}.pdf`);
+        const compile = () => run("latexmk", [latexEngine(source), "-interaction=nonstopmode", "-file-line-error", "-halt-on-error", "-norc", "-g", source.main], { cwd: work, timeoutMs, signal });
+        let tex = await compile();
+        // A font the document names isn't installed here (Arial on Linux): check the layout with its
+        // metric-compatible stand-in instead. Only this build's copy changes; the source stays as written.
+        const substituted = new Set<string>();
+        for (let i = 0; i < 3 && (tex.code !== 0 || !existsSync(pdf)); i++) {
+          const log = existsSync(join(work, `${base}.log`)) ? readFileSync(join(work, `${base}.log`), "utf8") : "";
+          const missing = /The font "([^"]+)" cannot be found/.exec(log)?.[1];
+          const stand = missing && !substituted.has(missing) ? METRIC_COMPATIBLE[missing] : undefined;
+          if (!missing || !stand) break;
+          substituted.add(missing);
+          missingFonts.add(missing);
+          files = substituteFont(files, missing, stand);
+          write(files);
+          tex = await compile();
+        }
         if (tex.code !== 0 || !existsSync(pdf)) {
           const log = existsSync(join(work, `${base}.log`)) ? readFileSync(join(work, `${base}.log`), "utf8") : "";
           const errors = [...log.matchAll(/^(?:\.\/)?([^:\n]+\.(?:tex|cls|sty)):(\d+): (.*)$/gm)].map((m) => ({ file: m[1], line: Number(m[2]), message: m[3] }));
