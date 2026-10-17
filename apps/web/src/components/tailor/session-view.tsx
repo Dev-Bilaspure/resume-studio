@@ -285,7 +285,8 @@ function Questions({ session, onDone }: { session: Session; onDone(): void }) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-6 py-10">
-        <h2 className="text-lg font-semibold">A few must-haves aren&apos;t on your resume yet</h2>
+        {session.fit && <FitCard fit={session.fit} className="mb-6" />}
+        <h2 className="text-lg font-semibold">A few requirements aren&apos;t clearly shown on your resume yet</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           If you&apos;ve done any of these, say where and what, briefly. Answers are only used as written, and are saved to your profile so you won&apos;t be
           asked again. If you haven&apos;t, say so: nothing will be claimed.

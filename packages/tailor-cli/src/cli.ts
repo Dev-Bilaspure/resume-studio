@@ -119,7 +119,7 @@ async function answerQuestions(s: Session): Promise<Answer[]> {
     log(`Skipping ${questions.length} question${questions.length === 1 ? "" : "s"} (no terminal; use --answers for scripts).`);
     return [];
   }
-  console.error(`\n${bold("A few must-haves aren't on your resume yet.")} If you've done any of these, say where and what, briefly.`);
+  console.error(`\n${bold("A few requirements aren't clearly shown on your resume yet.")} If you've done any of these, say where and what, briefly.`);
   console.error(dim("Answers are used as written and saved for next time. Press Enter for \"I haven't done this\".\n"));
   const rl = createInterface({ input: process.stdin, output: process.stderr });
   const out: Answer[] = [];
