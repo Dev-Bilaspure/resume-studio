@@ -2,7 +2,7 @@
 // check (unknown target, broken markup, a number or technology the evidence doesn't contain) goes to
 // repair; soft problems (length) are flagged for the reviewer.
 import { docText } from "./doc.ts";
-import { canonical, isSoftTerm, mentions, techTerms } from "./lexicon.ts";
+import { canonical, impliedBy, isSoftTerm, mentions, techTerms } from "./lexicon.ts";
 import type { EditOutput } from "./prompts.ts";
 import { markupProblems, plain, unsupportedNumbers } from "./text.ts";
 import type { Edit, EditOp, EvidenceRef, Fact, JobProfile, ResumeDoc, TailorOptions } from "./types.ts";
@@ -185,7 +185,9 @@ export function checkEdits(edits: Edit[], ix: DocIndex, profile: JobProfile, opt
       // Technologies: in a bullet/paragraph they must come from the cited evidence; in a skills line or
       // headline, from anywhere in the resume or facts (skills you have, possibly worded the job's way).
       const pool = c.op === "rewrite_skills" || c.op === "set_headline" ? ix.allText : sources.join("\n");
-      const introduced = techTerms(c.text, jobTerms, { hardOnly: true }).filter((t) => !isSoftTerm(t) && !mentions(pool, t, aliasesOf(profile, t)));
+      const introduced = techTerms(c.text, jobTerms, { hardOnly: true }).filter(
+        (t) => !isSoftTerm(t) && !mentions(pool, t, aliasesOf(profile, t)) && !impliedBy(t).some((x) => mentions(pool, x)),
+      );
       if (introduced.length) {
         if (c.op === "rewrite_skills" && opts.allowNewSkills === false) issues.push(`adds skills: ${introduced.join(", ")}`);
         else if (c.op === "rewrite_skills") issues.push(`adds skills with no evidence in the resume or facts: ${introduced.join(", ")}`);

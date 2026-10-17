@@ -133,3 +133,14 @@ test("virtual document and merging page-fit cuts", () => {
   assert.equal(merged.find((e) => e.id === "e1")!.change.op, "remove_bullet");
   assert.equal(merged.find((e) => e.id === "e2")!.status, "dropped");
 });
+
+test("a managed service proves its platform, not the other way round", () => {
+  const ix = indexDoc(doc, []);
+  // b1 runs workers on AKS (Azure); b2 is on AWS Lambda (AWS).
+  const azure = edit("e1", { op: "rewrite_skills", target: "s1", text: "TypeScript, Go, Azure, AWS" });
+  const bullet = edit("e2", { op: "rewrite_bullet", target: "b1", text: "Designed a **DAG-driven** pipeline on **Temporal**, cutting pipeline failures by **60%**; ran its workers on **Azure** (**AKS**)." }, [{ kind: "bullet", id: "b1" }]);
+  assert.deepEqual(checkEdits([azure, bullet], ix, profile, {}).passed.map((e) => e.id), ["e1", "e2"]);
+  // Azure doesn't prove AKS, and AWS isn't evidence for Google Cloud.
+  const reverse = edit("e3", { op: "rewrite_skills", target: "s1", text: "TypeScript, Go, GKE" });
+  assert.match(checkEdits([reverse], ix, profile, {}).failed[0].issues.join(), /Google Kubernetes Engine/);
+});

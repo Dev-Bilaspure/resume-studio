@@ -236,6 +236,23 @@ export interface LexiconEntry {
 
 export const LEXICON: LexiconEntry[] = Object.entries(TERMS).map(([term, aliases]) => ({ term, aliases }));
 
+/**
+ * Using a managed service is evidence for its platform: running workers on AKS is Azure experience,
+ * pgvector is PostgreSQL. Only certain implications belong here (a product of exactly one platform).
+ */
+const IMPLIES: Record<string, string[]> = {
+  AWS: ["AWS Lambda", "Amazon EC2", "Amazon S3", "Amazon ECS", "Amazon EKS", "Amazon RDS", "AWS CloudFormation", "AWS CDK", "DynamoDB", "Amazon SQS", "Amazon SNS"],
+  GCP: ["Google Kubernetes Engine", "Cloud Functions", "Cloud Run", "BigQuery"],
+  Azure: ["Azure Kubernetes Service"],
+  Kubernetes: ["Amazon EKS", "Google Kubernetes Engine", "Azure Kubernetes Service"],
+  PostgreSQL: ["pgvector", "Supabase"],
+};
+
+/** Terms whose mention also proves `term` (its managed services, its extensions). */
+export function impliedBy(term: string): string[] {
+  return IMPLIES[canonical(term)] ?? [];
+}
+
 /** Single-letter / ambiguous terms only count when written exactly (case-sensitive): "C", "R", "Go". */
 const CASE_SENSITIVE = new Set(["C", "R", "Go", "Next", "Node", "Spark", "Modal", "Bun", "Elastic", "Rails", "CI", "HA", "ML", "TS", "JS", "Lambda", "Spring", "Bull", "shell", "containers", "Unix", "LLM", "HCL"]);
 
