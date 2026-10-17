@@ -4,7 +4,7 @@
 import { z } from "zod";
 import type { Answer, Edit, Fact, JobInput, JobProfile, Question, RequirementMatch, ResumeDoc, TailorOptions } from "./types.ts";
 
-export const PROMPTS_VERSION = "2026-10-17.2";
+export const PROMPTS_VERSION = "2026-10-17.3";
 
 // ---- Shared: how the resume and facts are shown to the model ----------------------------------------------
 
@@ -234,7 +234,7 @@ export function editsPrompt(args: {
   const { doc, facts, job, profile, matches, opts, currentPages } = args;
   const budget = opts.maxPages ?? currentPages;
   const rules = [
-    `- Edit operations: rewrite_bullet, remove_bullet, add_bullet (only with a fact or another bullet as evidence), reorder_bullets (within one entry; list every bullet id of the entry), rewrite_paragraph (the summary), rewrite_skills (one skills line: reorder, use the job's spellings${opts.allowNewSkills === false ? "" : ", add skills proven by facts"}, drop irrelevant ones if space is short; keep its label)${opts.allowHeadline === false ? "" : ', set_headline (the role line under the name: the target title or a truthful variant of it; don\'t claim a level the experience doesn\'t support)'}.`,
+    `- Edit operations: rewrite_bullet, remove_bullet, add_bullet (only with a fact or another bullet as evidence), reorder_bullets (within one entry; list every bullet id of the entry), rewrite_paragraph (the summary), rewrite_skills (one skills line: reorder, use the job's spellings${opts.allowNewSkills === false ? "" : ", add skills proven by facts"}, drop irrelevant ones if space is short; keep its label)${opts.allowHeadline === false ? "" : ', set_headline (the role line under the name: the target title or a truthful variant of it; don\'t claim a level the experience doesn\'t support, and name the job\'s own specialty or none: not "Backend" for a full-stack role)'}.`,
     "- Don't reorder entries or sections; keep reverse-chronological order. Never remove every bullet of an entry.",
     budget ? `- Page budget: ${budget} page${budget === 1 ? "" : "s"}${currentPages ? ` (currently ${currentPages})` : ""}. Added text must be paid for by cuts.` : "",
     "- Only edit what improves the fit. Untouched is fine. Don't rewrite a bullet just to change words.",

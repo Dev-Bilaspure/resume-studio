@@ -200,6 +200,10 @@ export function checkEdits(edits: Edit[], ix: DocIndex, profile: JobProfile, opt
       if ((c.op === "rewrite_bullet" || c.op === "add_bullet") && len > allowed) soft.push(`longer than before (${len} characters): may add a line`);
       if (c.op === "set_headline" && len > MAX_HEADLINE_CHARS) issues.push("headline too long");
       if (c.op === "set_headline" && /\*|\[/.test(c.text)) issues.push("headline must be plain text");
+      if (c.op === "set_headline") {
+        const clash = specialtyClash(c.text, profile.roleFamily);
+        if (clash) issues.push(`headline says ${clash.headline} but the role is ${clash.role}: name the role's own specialty, or none`);
+      }
     }
 
     if (issues.length) {
@@ -219,4 +223,49 @@ export function checkEdits(edits: Edit[], ix: DocIndex, profile: JobProfile, opt
 function aliasesOf(profile: JobProfile, term: string): string[] {
   const k = profile.keywords.find((x) => canonical(x.term) === canonical(term));
   return k ? k.aliases : [];
+}
+
+// ---- Headline specialty ------------------------------------------------------------------------------------
+
+/** Specialties a headline or a role family can name, with the words that signal each. */
+const SPECIALTIES: Record<string, RegExp> = {
+  "full-stack": /\bfull[\s-]?stack\b/i,
+  backend: /\bback[\s-]?end\b/i,
+  frontend: /\bfront[\s-]?end\b/i,
+  mobile: /\b(mobile|ios|android)\b/i,
+  data: /\bdata (engineer|engineering|platform)\b/i,
+  ml: /\b(machine learning|ml|ai) (engineer|engineering)\b/i,
+  infrastructure: /\b(infrastructure|platform|devops|site reliability|sre|cloud)\b/i,
+  security: /\bsecurity\b/i,
+};
+
+function specialtyOf(text: string): string[] {
+  return Object.entries(SPECIALTIES)
+    .filter(([, re]) => re.test(text))
+    .map(([k]) => k);
+}
+
+/**
+ * A headline that names a different specialty than the job's ("Backend" for a full-stack role) works
+ * against the application. Naming none is fine; naming the job's own is fine.
+ */
+export function specialtyClash(headline: string, roleFamily: string): { headline: string; role: string } | null {
+  const role = specialtyOf(roleFamily.replace(/-/g, " ").replace(/\b(fullstack|full stack)\b/i, "full-stack"))[0] ?? specialtyFamily(roleFamily);
+  if (!role) return null;
+  const named = specialtyOf(headline);
+  if (!named.length || named.includes(role)) return null;
+  return { headline: named.join(" and "), role };
+}
+
+function specialtyFamily(family: string): string | null {
+  const f = family.toLowerCase().replace(/[\s_]/g, "-");
+  if (/full-?stack/.test(f)) return "full-stack";
+  if (/back-?end/.test(f)) return "backend";
+  if (/front-?end/.test(f)) return "frontend";
+  if (/infra|platform|devops|sre|reliability|cloud/.test(f)) return "infrastructure";
+  if (/^ml$|machine|ai/.test(f)) return "ml";
+  if (/data/.test(f)) return "data";
+  if (/mobile|ios|android/.test(f)) return "mobile";
+  if (/security/.test(f)) return "security";
+  return null;
 }

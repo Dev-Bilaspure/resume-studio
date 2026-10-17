@@ -158,3 +158,15 @@ test("fit: must-have coverage, weak counts half, missing years or degree caps it
   const f = assessFit(p(years), m([["a", "strong"], ["b", "strong"], ["c", "strong"], ["y", "missing"]]));
   assert.deepEqual([f.level, f.hardGap, f.gaps], ["stretch", true, ["y"]], "75% covered, but the years requirement is missing");
 });
+
+test("a headline names the job's specialty or none", async () => {
+  const { specialtyClash } = await import("./verify.ts");
+  assert.deepEqual(specialtyClash("Software Engineer | Backend (TypeScript, Node.js, Go)", "full-stack"), { headline: "backend", role: "full-stack" });
+  assert.equal(specialtyClash("Full-Stack Software Engineer", "full-stack"), null);
+  assert.equal(specialtyClash("Software Engineer", "full-stack"), null, "no specialty is fine");
+  assert.equal(specialtyClash("Backend & Infrastructure Engineer", "infrastructure"), null, "naming the role's own, among others, is fine");
+  assert.deepEqual(specialtyClash("Backend Engineer", "platform"), { headline: "backend", role: "infrastructure" });
+  const ix = indexDoc(doc, []);
+  const r = checkEdits([edit("e1", { op: "set_headline", target: "h1", text: "Frontend Engineer" })], ix, profile, {});
+  assert.match(r.failed[0].issues.join(), /headline says frontend but the role is backend/);
+});
