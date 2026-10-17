@@ -3,7 +3,14 @@
 import { configFromEnv } from "./config.ts";
 import { createTailorServer } from "./server.ts";
 
-const config = configFromEnv();
+let config;
+try {
+  config = configFromEnv();
+} catch (e) {
+  // A configuration problem is a message for whoever starts the server, not a crash.
+  console.error(`tailor-server: ${(e as Error).message}`);
+  process.exit(1);
+}
 const server = createTailorServer(config);
 server.listen(config.port, config.host, () => {
   console.log(`tailor-server on http://${config.host}:${config.port} · providers: ${config.providers.map((p) => p.provider).join(", ")}${config.apiKey ? " · auth on" : ""}`);
