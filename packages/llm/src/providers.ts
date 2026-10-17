@@ -1,7 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { createOpenAI } from "@ai-sdk/openai";
-import { APICallError, NoObjectGeneratedError, NoOutputGeneratedError, Output, generateText, type LanguageModel } from "ai";
+import { APICallError, NoObjectGeneratedError, NoOutputGeneratedError, Output, RetryError, generateText, type LanguageModel } from "ai";
 import { createClaudeCode, isAuthenticationError, isTimeoutError } from "ai-sdk-provider-claude-code";
 import { LLMError, type GenerateRequest, type GenerateResult, type LLM, type ProviderConfig, type ProviderId } from "./types.ts";
 
@@ -69,8 +69,10 @@ function acceptsTemperature(config: ProviderConfig) {
   return true;
 }
 
-function toLLMError(e: unknown, provider: ProviderId): LLMError {
+export function toLLMError(e: unknown, provider: ProviderId): LLMError {
   if (e instanceof LLMError) return e;
+  // "Failed after 3 attempts": classify what actually went wrong.
+  if (RetryError.isInstance(e) && e.lastError) return toLLMError(e.lastError, provider);
   if (e instanceof NoObjectGeneratedError || e instanceof NoOutputGeneratedError) {
     return new LLMError("invalid_output", `The model's answer didn't match the expected format: ${(e as Error).message}`, true, provider, e);
   }
@@ -80,7 +82,11 @@ function toLLMError(e: unknown, provider: ProviderId): LLMError {
     if (isAuthenticationError(e)) return new LLMError("auth", "Claude Code isn't logged in. Run `claude` in a terminal and log in.", false, provider, e);
     if (isTimeoutError(e)) return new LLMError("timeout", "Claude Code took too long to answer", true, provider, e);
     if (/ENOENT|not found|spawn/i.test(err?.message ?? "")) return new LLMError("unavailable", "Claude Code isn't installed or can't be started", false, provider, e);
-    if (/usage limit|rate limit|limit reached/i.test(err?.message ?? "")) return new LLMError("rate_limit", "Your Claude subscription's usage limit was reached", false, provider, e);
+    if (/usage limit|rate limit|limit reached|session limit|hit your .*limit/i.test(err?.message ?? "")) {
+      // Claude Code says when it resets ("resets 2:40am (Asia/Calcutta)"): pass that on.
+      const resets = /resets? ([^·\n]+)/i.exec(err?.message ?? "")?.[1]?.trim();
+      return new LLMError("rate_limit", `Your Claude subscription's usage limit was reached${resets ? `. It resets ${resets}` : ""}.`, false, provider, e);
+    }
   }
   if (APICallError.isInstance(e)) {
     const s = e.statusCode ?? 0;
@@ -112,9 +118,12 @@ export function createLLM(config: ProviderConfig): LLM {
           system: req.system,
           ...(typeof req.prompt === "string" ? { prompt: req.prompt } : { messages: req.prompt }),
           output: Output.object({ schema: req.schema, name: req.schemaName, description: req.schemaDescription }),
-          maxOutputTokens: req.maxOutputTokens ?? 16_000,
+          // Claude Code takes no output cap (it warns on every call if given one).
+          ...(config.provider === "claude-code" ? {} : { maxOutputTokens: req.maxOutputTokens ?? 16_000 }),
           ...(req.temperature !== undefined && acceptsTemperature(config) ? { temperature: req.temperature } : {}),
-          maxRetries: 2, // transient errors (429, 5xx, network) with backoff
+          // Transient errors (429, 5xx, network) with backoff. Claude Code retries API errors itself, and
+          // its limit errors don't clear in seconds: no second layer of retries there.
+          maxRetries: config.provider === "claude-code" ? 0 : 2,
           abortSignal: signal,
         });
         const data = result.output as T;
