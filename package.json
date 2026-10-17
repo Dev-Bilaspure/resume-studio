@@ -9,7 +9,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "tailor": "node packages/tailor-cli/bin/resume-tailor.js"
+    "tailor": "node packages/tailor-cli/bin/resume-tailor.js",
+    "eval": "node packages/tailor-eval/bin/tailor-eval.js"
   },
   "devDependencies": {
     "turbo": "^2.6.0"

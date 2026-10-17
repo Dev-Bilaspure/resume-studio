@@ -49,3 +49,7 @@ next-env.d.ts
 
 # turborepo
 .turbo/
+
+# Evaluation data (job postings, resumes) and results: local only
+/eval-data/
+/eval-results/
