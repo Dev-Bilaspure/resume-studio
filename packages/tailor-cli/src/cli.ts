@@ -7,17 +7,19 @@ import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
 import { LLMError, createLLM, type ProviderId } from "@resume-studio/llm";
 import { defaultModelsFromEnv, providersFromEnv } from "@resume-studio/llm/env";
-import { createTailorEngine, type Answer, type Edit, type Seniority, type Session } from "@resume-studio/tailor";
+import { createTailorEngine, jobCompany, jobTitle, type Answer, type Edit, type Seniority, type Session } from "@resume-studio/tailor";
 import { fileFactStore, fileSessionStore } from "@resume-studio/tailor/node";
 import { latexAdapter } from "@resume-studio/tailor-latex";
 import { latexmkVerifier, readResumeFolder, writeResumeFolder } from "@resume-studio/tailor-latex/node";
 
-const USAGE = `Usage: resume-tailor <resume.tex | resume folder> --jd <posting.txt | -> --company <name> --role "<exact title>" [options]
+const USAGE = `Usage: resume-tailor <resume.tex | resume folder> --jd <posting.txt | -> [options]
 
 Tailors the resume to the job: every requirement is matched to your experience, the relevant parts are
 rewritten in the job's language, and every change is fact-checked against your resume and compiled.
 
 Options:
+  --company <name>       the company (default: read from the posting)
+  --role "<title>"       the exact job title (default: read from the posting)
   --level <intern|junior|mid|senior|staff|principal|manager>   the role's level (default: read from the posting)
   --pages <n>            page budget (default: the resume's current length)
   --no-questions         don't ask about must-haves the resume doesn't show
@@ -62,7 +64,7 @@ function usage(message?: string): never {
 
 if (opt.help) usage();
 const resumePath = positionals[0];
-if (!resumePath || !opt.jd || !opt.company || !opt.role) usage("Missing the resume, --jd, --company or --role.");
+if (!resumePath || !opt.jd) usage("Missing the resume or --jd.");
 const LEVELS = ["intern", "junior", "mid", "senior", "staff", "principal", "manager"];
 if (opt.level && !LEVELS.includes(opt.level)) usage(`--level must be one of ${LEVELS.join(", ")}`);
 
@@ -153,7 +155,7 @@ function summary(s: Session) {
   const kw = r.before.keywordsFound.length + r.before.keywordsMissing.length;
   const lines = [
     "",
-    bold(`${s.job.role} · ${s.job.company}`),
+    bold(`${jobTitle(s.job)} · ${jobCompany(s.job)}`),
     `${dim("Approach")}  ${s.strategy ?? ""}`,
     `${dim("Requirements clearly shown")}  ${r.before.requirementsStrong} → ${green(String(r.after.requirementsStrong))} of ${r.before.requirementsTotal}    ${dim("Must-have keywords")}  ${r.before.keywordsFound.length} → ${green(String(r.after.keywordsFound.length))} of ${kw}    ${dim("Pages")}  ${r.before.build?.pages ?? "?"} → ${r.after.build?.pages ?? "?"}`,
   ];
@@ -175,9 +177,9 @@ function summary(s: Session) {
 
 // ---- Run -------------------------------------------------------------------------------------------------------
 
-log(`Tailoring ${source.main} for ${opt.role} at ${opt.company} · ${chosen.provider} · ${model}`);
+log(`Tailoring ${source.main}${opt.role ? ` for ${opt.role}` : ""}${opt.company ? ` at ${opt.company}` : ""} · ${chosen.provider} · ${model}`);
 let s = await engine.start({
-  job: { company: opt.company!, role: opt.role!, seniority: opt.level as Seniority | undefined, description },
+  job: { company: opt.company ?? "", role: opt.role ?? "", seniority: opt.level as Seniority | undefined, description },
   source,
   options: { maxPages: opt.pages ? Number(opt.pages) : undefined, askQuestions: !opt["no-questions"] },
 });
@@ -209,7 +211,7 @@ if (opt.out) {
   const accepted = (s.edits ?? []).filter((e) => e.status !== "dropped" && !reject.has(e.id)).map((e) => e.id);
   const { source: tailored } = await engine.finalize(s.id, accepted);
   try {
-    const out = writeResumeFolder(dir, opt.out, tailored, { "jd.md": `# ${s.job.role} · ${s.job.company}\n\n${s.job.description}\n` });
+    const out = writeResumeFolder(dir, opt.out, tailored, { "jd.md": `# ${jobTitle(s.job)} · ${jobCompany(s.job)}\n\n${s.job.description}\n` });
     console.error(green(`\nSaved to ${out} (${accepted.length} change${accepted.length === 1 ? "" : "s"}; the job description is in jd.md).`));
   } catch (e) {
     console.error(red(`\nNot saved: ${(e as Error).message}`));

@@ -52,12 +52,13 @@ export function jobInput(p: Posting): JobInput {
 export function loadPostings(dataDir: string): Posting[] {
   const dir = join(dataDir, "jds");
   return readdirSync(dir)
-    .filter((f) => f.endsWith(".md"))
+    .filter((f) => f.endsWith(".md") || f.endsWith(".txt"))
     .sort()
     .map((f) => {
       const { fields, body } = parseFrontMatter(readFileSync(join(dir, f), "utf8"));
-      if (!fields.company || !fields.role || body.length < 200) throw new Error(`${f}: needs company, role and the posting's text`);
-      return { id: f.replace(/\.md$/, ""), company: fields.company, role: fields.role, level: fields.level, family: fields.family, location: fields.location, url: fields.url, description: body };
+      // A posting can be pasted as it came (no front matter): the engine reads company and title from it.
+      if (body.length < 200) throw new Error(`${f}: needs the posting's text`);
+      return { id: f.replace(/\.(md|txt)$/, ""), company: fields.company ?? "", role: fields.role ?? "", level: fields.level, family: fields.family, location: fields.location, url: fields.url, description: body };
     });
 }
 

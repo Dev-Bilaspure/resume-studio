@@ -30,9 +30,9 @@ export function createMcpServer(deps: ToolsDeps) {
         "Tailors a LaTeX resume on this computer to a job posting: reads the posting, matches each requirement to the resume, rewrites the relevant parts in the job's language, and fact-checks every change against the resume (nothing is invented; numbers can't appear from nowhere). The result is compiled to check it builds and fits the page. It may come back with questions about must-haves the resume doesn't show: ask the candidate, then call answer_tailoring_questions. Takes 1–4 minutes.",
       inputSchema: {
         resume_path: z.string().describe("Absolute path to the resume's main .tex file or its folder"),
-        job_description: z.string().min(80).describe("The full job posting text"),
-        company: z.string().min(1),
-        role: z.string().min(1).describe("The exact job title from the posting"),
+        job_description: z.string().min(80).describe("The full job posting, as the company gives it (boilerplate is fine)"),
+        company: z.string().optional().describe("Leave out to read it from the posting"),
+        role: z.string().optional().describe("The exact job title; leave out to read it from the posting"),
         seniority: z.enum(["intern", "junior", "mid", "senior", "staff", "principal", "manager"]).optional(),
         max_pages: z.number().int().min(1).max(4).optional().describe("Page budget; default: the resume's current length"),
         ask_questions: z.boolean().optional().describe("Ask about missing must-haves first (default true)"),

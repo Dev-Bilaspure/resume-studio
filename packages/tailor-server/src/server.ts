@@ -40,8 +40,9 @@ class HttpError extends Error {
 const Seniority = z.enum(["intern", "junior", "mid", "senior", "staff", "principal", "manager"]);
 const Start = z.object({
   job: z.object({
-    company: z.string().trim().min(1).max(200),
-    role: z.string().trim().min(1).max(200),
+    // Optional: read from the posting when left out.
+    company: z.string().trim().max(200).default(""),
+    role: z.string().trim().max(200).default(""),
     seniority: Seniority.optional(),
     description: z.string().trim().min(80, "the job description looks incomplete").max(60_000),
     location: z.string().max(200).optional(),

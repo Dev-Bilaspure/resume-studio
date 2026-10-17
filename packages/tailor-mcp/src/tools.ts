@@ -3,7 +3,7 @@
 // assistant to read and relay: what happened, what changed and why, and what to call next.
 import { resolve } from "node:path";
 import { createLLM, type LLM, type ProviderConfig } from "@resume-studio/llm";
-import { createTailorEngine, type Answer, type Edit, type FactStore, type Seniority, type Session, type SessionStore } from "@resume-studio/tailor";
+import { createTailorEngine, jobCompany, jobTitle, type Answer, type Edit, type FactStore, type Seniority, type Session, type SessionStore } from "@resume-studio/tailor";
 import { latexAdapter } from "@resume-studio/tailor-latex";
 import { latexmkVerifier, readResumeFolder, writeResumeFolder } from "@resume-studio/tailor-latex/node";
 
@@ -68,8 +68,8 @@ export function createTools(deps: ToolsDeps) {
     async tailor(args: {
       resumePath: string;
       jobDescription: string;
-      company: string;
-      role: string;
+      company?: string;
+      role?: string;
       seniority?: Seniority;
       maxPages?: number;
       askQuestions?: boolean;
@@ -78,7 +78,7 @@ export function createTools(deps: ToolsDeps) {
     }) {
       const { dir, source } = readResumeFolder(args.resumePath);
       const s = await engine(dir).start({
-        job: { company: args.company, role: args.role, seniority: args.seniority, description: args.jobDescription },
+        job: { company: args.company ?? "", role: args.role ?? "", seniority: args.seniority, description: args.jobDescription },
         source,
         options: { maxPages: args.maxPages, askQuestions: args.askQuestions ?? true },
         context: { resumeDir: dir, resumePath: resolve(args.resumePath) },
@@ -109,7 +109,7 @@ export function createTools(deps: ToolsDeps) {
       const reject = new Set(args.rejectEditIds ?? []);
       const accepted = (s.edits ?? []).filter((e) => e.status !== "dropped" && !reject.has(e.id)).map((e) => e.id);
       const { source } = await engine(s.context.resumeDir).finalize(s.id, accepted);
-      const out = writeResumeFolder(s.context.resumeDir, args.outputDir, source, { "jd.md": `# ${s.job.role} · ${s.job.company}\n\n${s.job.description.trim()}\n` });
+      const out = writeResumeFolder(s.context.resumeDir, args.outputDir, source, { "jd.md": `# ${jobTitle(s.job)} · ${jobCompany(s.job)}\n\n${s.job.description.trim()}\n` });
       return `Saved to ${out} with ${accepted.length} of ${(s.edits ?? []).filter((e) => e.status !== "dropped").length} changes (main file: ${source.main}; the job description is in jd.md). The original at ${s.context.resumeDir} is unchanged.`;
     },
   };
@@ -135,7 +135,7 @@ function original(s: Session, e: Edit): string | null {
 }
 
 export function describe(s: Session, running: boolean): string {
-  const head = `Session ${s.id} · ${s.job.role} at ${s.job.company} · ${s.status}`;
+  const head = `Session ${s.id} · ${jobTitle(s.job)} at ${jobCompany(s.job)} · ${s.status}`;
   if (WORKING.has(s.status)) {
     const last = [...s.events].reverse().find((e) => e.type === "step");
     return running

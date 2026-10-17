@@ -1,6 +1,6 @@
 // Runs one case: tailor the resume for the posting with the real engine, then audit and screen the result.
 import { LLMError, type LLM } from "@resume-studio/llm";
-import { createTailorEngine, memoryFactStore, memorySessionStore, type Session } from "@resume-studio/tailor";
+import { createTailorEngine, jobCompany, jobTitle, memoryFactStore, memorySessionStore, type Session } from "@resume-studio/tailor";
 import { latexAdapter } from "@resume-studio/tailor-latex";
 import { latexmkVerifier } from "@resume-studio/tailor-latex/node";
 import { jobInput, type Case } from "./data.ts";
@@ -79,7 +79,8 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
     id: c.id,
     resume: c.resume.id,
     jd: c.posting.id,
-    posting: { company: c.posting.company, role: c.posting.role, level: c.posting.level, family: c.posting.family },
+    // As the engine read them (a raw posting has no front matter).
+    posting: { company: jobCompany(s.job), role: jobTitle(s.job), level: c.posting.level ?? s.job.seniority ?? s.profile?.seniority, family: c.posting.family ?? s.profile?.roleFamily },
     status: s.status,
     error: s.error?.message,
     engine: {
