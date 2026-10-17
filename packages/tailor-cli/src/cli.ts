@@ -156,6 +156,7 @@ function summary(s: Session) {
   const lines = [
     "",
     bold(`${jobTitle(s.job)} · ${jobCompany(s.job)}`),
+    ...(s.fit ? [`Fit before tailoring: ${({ strong: "strong fit", stretch: "stretch", "long-shot": "long shot" } as const)[s.fit.level]} (${s.fit.must.strong} of ${s.fit.must.total} must-haves clearly shown${s.fit.gaps.length ? `; not on the resume: ${s.fit.gaps.slice(0, 4).join("; ")}` : ""})`] : []),
     `${dim("Approach")}  ${s.strategy ?? ""}`,
     `${dim("Requirements clearly shown")}  ${r.before.requirementsStrong} → ${green(String(r.after.requirementsStrong))} of ${r.before.requirementsTotal}    ${dim("Must-have keywords")}  ${r.before.keywordsFound.length} → ${green(String(r.after.keywordsFound.length))} of ${kw}    ${dim("Pages")}  ${r.before.build?.pages ?? "?"} → ${r.after.build?.pages ?? "?"}`,
   ];

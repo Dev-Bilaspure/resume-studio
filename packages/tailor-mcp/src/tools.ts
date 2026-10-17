@@ -153,6 +153,7 @@ export function describe(s: Session, running: boolean): string {
   const dropped = (s.edits ?? []).filter((e) => e.status === "dropped");
   const lines = [
     head,
+    ...(s.fit ? [`Fit before tailoring: ${({ strong: "strong fit", stretch: "stretch", "long-shot": "long shot" } as const)[s.fit.level]} (${s.fit.must.strong} of ${s.fit.must.total} must-haves clearly shown${s.fit.gaps.length ? `; not on the resume: ${s.fit.gaps.slice(0, 4).join("; ")}` : ""})`] : []),
     `Approach: ${s.strategy ?? ""}`,
     `Requirements clearly shown: ${r.before.requirementsStrong} → ${r.after.requirementsStrong} of ${r.before.requirementsTotal}. Must-have keywords: ${r.before.keywordsFound.length} → ${r.after.keywordsFound.length} of ${r.before.keywordsFound.length + r.before.keywordsMissing.length}${r.after.keywordsMissing.length ? ` (not claimed, no evidence: ${r.after.keywordsMissing.join(", ")})` : ""}. Pages: ${r.before.build?.pages ?? "?"} → ${r.after.build?.pages ?? "?"}.`,
     ...(r.warnings.length ? [`Warnings: ${r.warnings.join(" ")}`] : []),
