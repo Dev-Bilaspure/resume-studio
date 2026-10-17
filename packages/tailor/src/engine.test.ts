@@ -140,3 +140,31 @@ test("questions pause the session; answers become facts and resume it", async ()
   assert.equal(done.edits![0].status, "ok", done.edits![0].issues?.join());
   assert.deepEqual(llm.calls, ["job_profile", "requirement_matches", "facts", "resume_edits", "fact_check"]);
 });
+
+test("a failed run resumes with retry, keeping the steps that finished", async () => {
+  let limited = true;
+  const llm = scriptedLLM({
+    job_profile: () => profile,
+    requirement_matches: () => ({ matches: [{ requirementId: "r1", status: "missing", evidence: [], note: "n" }], questions: [] }),
+    resume_edits: () => {
+      if (limited) throw new Error("usage limit reached");
+      return { strategy: "s", edits: [edit("rewrite_bullet", "b2", "Cut failures **60%** using **Temporal**.")] };
+    },
+    fact_check: (req) => ({ verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })) }),
+  });
+  const engine = createTailorEngine({ llm, adapter });
+  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const failed = await engine.run(s0.id);
+  assert.equal(failed.status, "failed");
+  assert.equal((await engine.run(s0.id)).status, "failed", "run() alone retries a failed session too, and fails the same way");
+
+  limited = false;
+  const before = llm.calls.length;
+  assert.equal((await engine.retry(s0.id)).status, "analyzing");
+  const done = await engine.run(s0.id);
+  assert.equal(done.status, "ready", done.error?.message);
+  assert.equal(done.error, undefined);
+  // The job analysis and matching weren't redone.
+  assert.deepEqual(llm.calls.slice(before), ["resume_edits", "fact_check"]);
+  assert.equal((await engine.getSession(s0.id)).status, "ready");
+});

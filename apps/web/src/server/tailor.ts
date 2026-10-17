@@ -235,11 +235,8 @@ export async function answerSession(id: string, answers: Answer[]) {
 /** Runs again after a failure or cancel; finished steps are kept. */
 export async function retrySession(id: string) {
   const s = await getSession(id);
-  if (s.status === "cancelled" || s.status === "failed") {
-    s.status = s.answers || !s.questions?.length ? "writing" : "analyzing";
-    s.error = undefined;
-    await sessionStore.put(s);
-  }
+  const { make } = await engineSetup({ resumeId: s.context.resumeId, provider: s.context.provider as ProviderId, model: s.context.model });
+  await make(id).retry(id);
   await runInBackground(id);
 }
 

@@ -399,6 +399,20 @@ export function createTailorEngine(deps: EngineDeps) {
       }
     },
 
+    /** The session as stored. */
+    async getSession(id: string): Promise<Session> {
+      return load(id);
+    },
+
+    /** After a failure or a cancel: makes the session runnable again. Finished steps are kept; call run(). */
+    async retry(id: string): Promise<Session> {
+      const s = await load(id);
+      if (s.status !== "failed" && s.status !== "cancelled") return s;
+      s.error = undefined;
+      await save(s, "analyzing");
+      return s;
+    },
+
     /** Your answers to the questions ("I don't have this" counts). Then call run() to continue. */
     async answer(id: string, answers: Answer[]): Promise<Session> {
       const s = await load(id);
