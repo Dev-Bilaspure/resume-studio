@@ -16,7 +16,15 @@ docker run -p 8787:8787 -e TAILOR_API_KEY=change-me -e ANTHROPIC_API_KEY=sk-ant-
 ```
 
 Needs Node 24+ (it runs the TypeScript sources directly), TeX Live (`latexmk`) and poppler (`pdfinfo`,
-`pdftotext`). The Docker image has all three.
+`pdftotext`). The Docker image has all three: it's built on the official, complete TeX Live 2026 (the
+same distribution as Overleaf and MacTeX, pinned by digest), so a resume that builds there builds here.
+It's large (about 10 GB unpacked, 2.7 GB to download) for that reason.
+
+Fonts: a resume that asks for a font this machine doesn't have (`\setmainfont{Arial}` on Linux) is
+checked with its metric-compatible free stand-in: Liberation Sans for Arial and Helvetica, Liberation
+Serif for Times New Roman, Liberation Mono for Courier New, Carlito for Calibri, Caladea for Cambria.
+They have the same character widths, so line breaks and page counts match. Only the check's copy
+changes; the LaTeX you get back still names the original font.
 
 ## Configuration
 

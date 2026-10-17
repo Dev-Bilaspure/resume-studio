@@ -7,3 +7,4 @@ resumes
 eval-data
 eval-results
 .git
+**/dist
