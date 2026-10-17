@@ -57,3 +57,6 @@ next-env.d.ts
 # Package builds
 packages/*/dist/
 /samples
+
+# The compile service run without Docker keeps its projects here.
+tex-service-data/
