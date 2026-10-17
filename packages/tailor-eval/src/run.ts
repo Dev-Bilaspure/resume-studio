@@ -2,7 +2,7 @@
 import { LLMError, type LLM } from "@resume-studio/llm";
 import { assessFit, createTailorEngine, jobCompany, jobTitle, memoryFactStore, memorySessionStore, type FitAssessment, type Session } from "@resume-studio/tailor";
 import { latexAdapter } from "@resume-studio/tailor-latex";
-import { latexmkVerifier } from "@resume-studio/tailor-latex/node";
+import { defaultVerifier } from "@resume-studio/tailor-latex/node";
 import { jobInput, type Case } from "./data.ts";
 import { answerAsCandidate, auditTruthfulness, screenOne, type Audit, type Screen } from "./judges.ts";
 
@@ -69,7 +69,7 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
   const engine = createTailorEngine({
     llm: deps.engineLLM,
     adapter: latexAdapter,
-    verifier: latexmkVerifier({ assetsDir: c.resume.dir }),
+    verifier: defaultVerifier({ assetsDir: c.resume.dir }),
     store: memorySessionStore(),
     facts: memoryFactStore(),
     onEvent: (_id, e) => e.type === "step" && deps.onStep?.(e.message),

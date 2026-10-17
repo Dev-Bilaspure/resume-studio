@@ -29,7 +29,8 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@resume-studio/tailor": "workspace:*"
+    "@resume-studio/tailor": "workspace:*",
+    "@resume-studio/tex-service": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

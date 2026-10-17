@@ -21,7 +21,7 @@ import { LLMError, PROVIDERS, createLLM, type ProviderId } from "@resume-studio/
 import { ENGINE_VERSION, PROMPTS_VERSION, SessionError, createTailorEngine, type Session, type TailorEvent } from "@resume-studio/tailor";
 import { fileSessionStore } from "@resume-studio/tailor/node";
 import { latexAdapter } from "@resume-studio/tailor-latex";
-import { latexmkVerifier } from "@resume-studio/tailor-latex/node";
+import { defaultVerifier } from "@resume-studio/tailor-latex/node";
 import { z } from "zod";
 import type { ServerConfig } from "./config.ts";
 
@@ -165,7 +165,7 @@ export function createTailorServer(config: ServerConfig, deps: ServerDeps = {}):
 
   function engineFor(s: { id: string; context: Record<string, string> }) {
     const llm = llmFor(s.context._provider as ProviderId, s.context._model);
-    return createTailorEngine({ llm, adapter: latexAdapter, verifier: latexmkVerifier({ assetsDir: assetsDir(s.id) }), store, onEvent: (id, e, sess) => broadcast(id, e, sess) });
+    return createTailorEngine({ llm, adapter: latexAdapter, verifier: defaultVerifier({ assetsDir: assetsDir(s.id) }), store, onEvent: (id, e, sess) => broadcast(id, e, sess) });
   }
 
   /** Runs a session in the background, at most `concurrency` at a time. */
@@ -325,7 +325,7 @@ export function createTailorServer(config: ServerConfig, deps: ServerDeps = {}):
       const engine = engineFor(s);
       if (action === "finalize") return send(res, 200, await engine.finalize(id, accepted));
       const source = await engine.preview(id, accepted);
-      const build = await latexmkVerifier({ assetsDir: assetsDir(id) }).build(source, { maxPages: s.options.maxPages });
+      const build = await defaultVerifier({ assetsDir: assetsDir(id) }).build(source, { maxPages: s.options.maxPages });
       return send(res, 200, { source, build: { ok: build.ok, pages: build.pages, errors: build.errors } });
     }
     throw new HttpError(404, "not_found", "Not found");

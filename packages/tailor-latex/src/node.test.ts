@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { latexEngine, latexmkVerifier } from "./node.ts";
+import { latexEngine, latexmkVerifier, texServiceVerifier } from "./node.ts";
 
 const classic = readFileSync(new URL("./fixtures/classic.tex", import.meta.url), "utf8");
 const hasTex = (() => {
@@ -79,4 +79,15 @@ test("font substitution touches font arguments only", async () => {
   assert.equal(out["main.tex"], "\\setmainfont{Liberation Sans}\n\\setsansfont[Scale=0.9]{ Liberation Sans }\n\\newfontfamily\\heading{Liberation Sans}\nArial is a font.\n\\setmainfont{Arial Black}");
   assert.equal(out["cv.cls"], "\\fontspec{Liberation Sans}");
   assert.equal(out["refs.bib"], "\\setmainfont{Arial}", "only TeX files");
+});
+
+test("the compile service verifier builds drafts like the local one", { skip: !process.env.TAILOR_TEX_SERVICE_URL && "set TAILOR_TEX_SERVICE_URL to a running compile service" }, async () => {
+  const v = texServiceVerifier({ url: process.env.TAILOR_TEX_SERVICE_URL! });
+  const r = await v.build({ main: "main.tex", files: { "main.tex": classic } }, { maxPages: 1 });
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.equal(r.pages, 1);
+  assert.match(r.text ?? "", /\w{4,}/);
+  const bad = await v.build({ main: "main.tex", files: { "main.tex": "\\documentclass{article}\n\\begin{document}\n\\oops\n\\end{document}\n" } }, {});
+  assert.equal(bad.ok, false);
+  assert.equal(bad.errors[0].line, 3);
 });

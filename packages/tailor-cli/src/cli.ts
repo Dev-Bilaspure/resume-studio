@@ -10,7 +10,7 @@ import { defaultModelsFromEnv, providersFromEnv } from "@resume-studio/llm/env";
 import { createTailorEngine, jobCompany, jobTitle, type Answer, type Edit, type Seniority, type Session } from "@resume-studio/tailor";
 import { fileFactStore, fileSessionStore } from "@resume-studio/tailor/node";
 import { latexAdapter } from "@resume-studio/tailor-latex";
-import { latexmkVerifier, readResumeFolder, writeResumeFolder } from "@resume-studio/tailor-latex/node";
+import { defaultVerifier, readResumeFolder, writeResumeFolder } from "@resume-studio/tailor-latex/node";
 
 const USAGE = `Usage: resume-tailor <resume.tex | resume folder> --jd <posting.txt | -> [options]
 
@@ -98,7 +98,7 @@ const log = (m: string) => console.error(dim(`  ${String(Math.round((Date.now() 
 const engine = createTailorEngine({
   llm: createLLM({ ...chosen, model }),
   adapter: latexAdapter,
-  verifier: latexmkVerifier({ assetsDir: dir }),
+  verifier: defaultVerifier({ assetsDir: dir }),
   store: fileSessionStore(join(opt.data!, "sessions")),
   facts: fileFactStore(join(opt.data!, "facts.json")),
   onEvent: (_id, e) => (e.type === "step" || e.type === "warning" ? log(e.message) : undefined),

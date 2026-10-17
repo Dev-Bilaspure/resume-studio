@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { createLLM, type LLM, type ProviderConfig } from "@resume-studio/llm";
 import { createTailorEngine, jobCompany, jobTitle, type Answer, type Edit, type FactStore, type Seniority, type Session, type SessionStore } from "@resume-studio/tailor";
 import { latexAdapter } from "@resume-studio/tailor-latex";
-import { latexmkVerifier, readResumeFolder, writeResumeFolder } from "@resume-studio/tailor-latex/node";
+import { defaultVerifier, readResumeFolder, writeResumeFolder } from "@resume-studio/tailor-latex/node";
 
 export interface ToolsDeps {
   provider: ProviderConfig;
@@ -26,7 +26,7 @@ export function createTools(deps: ToolsDeps) {
     return createTailorEngine({
       llm: makeLLM(deps.provider),
       adapter: latexAdapter,
-      verifier: latexmkVerifier({ assetsDir: resumeDir }),
+      verifier: defaultVerifier({ assetsDir: resumeDir }),
       store: deps.store,
       facts: deps.facts,
       onEvent: (id, e) => e.type === "step" && listeners.get(id)?.(e.message),

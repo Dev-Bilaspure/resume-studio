@@ -11,6 +11,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/llm packages/llm
 COPY packages/tailor packages/tailor
 COPY packages/tailor-latex packages/tailor-latex
+COPY packages/tex-service packages/tex-service
 COPY packages/tailor-server packages/tailor-server
 RUN pnpm install --frozen-lockfile --prod --filter @resume-studio/tailor-server...
 

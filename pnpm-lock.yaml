@@ -229,6 +229,9 @@ importers:
       '@resume-studio/tailor':
         specifier: workspace:*
         version: link:../tailor
+      '@resume-studio/tex-service':
+        specifier: workspace:*
+        version: link:../tex-service
     devDependencies:
       '@types/node':
         specifier: ^20.19.43

@@ -1,11 +1,14 @@
-// A BuildVerifier that compiles drafts with the local TeX installation (latexmk), for use outside
-// Resume Studio: the CLI, the evaluation harness, a standalone service. Needs TeX Live (latexmk) and
-// poppler (pdfinfo, pdftotext) on PATH or in the usual macOS/Linux locations.
+// BuildVerifiers for use outside Resume Studio (the CLI, the MCP server, the evaluation harness, a
+// standalone service): latexmkVerifier compiles drafts with the local TeX installation (TeX Live's
+// latexmk and poppler's pdfinfo/pdftotext, on PATH or in the usual macOS/Linux locations);
+// texServiceVerifier with the compile service; defaultVerifier picks.
 import { execFile } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, join, relative, resolve } from "node:path";
 import type { BuildCheck, BuildVerifier, SourceFiles } from "@resume-studio/tailor";
+import { createTexServiceClient, DEFAULT_PORT, folderEntries, memoryEntries, METRIC_COMPATIBLE, substituteFont } from "@resume-studio/tex-service";
 import { latexAdapter } from "./latex.ts";
 
 export interface LatexmkOptions {
@@ -41,24 +44,8 @@ export function latexEngine(source: SourceFiles): "-pdf" | "-xelatex" | "-lualat
   return /\\(usepackage|RequirePackage)(\[[^\]]*\])?\{[^}]*\b(fontspec|unicode-math|polyglossia)\b/.test(all) ? "-xelatex" : "-pdf";
 }
 
-/** Free fonts with the same character widths as common commercial ones: same line breaks, same page count. */
-export const METRIC_COMPATIBLE: Record<string, string> = {
-  Arial: "Liberation Sans",
-  Helvetica: "Liberation Sans",
-  "Helvetica Neue": "Liberation Sans",
-  "Times New Roman": "Liberation Serif",
-  Times: "Liberation Serif",
-  "Courier New": "Liberation Mono",
-  Calibri: "Carlito",
-  Cambria: "Caladea",
-};
-
-/** Replaces a font name where fontspec takes one (\setmainfont, \newfontfamily, \fontspec…), in every file. */
-export function substituteFont(files: Record<string, string>, from: string, to: string): Record<string, string> {
-  const name = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(\\\\(?:setmainfont|setsansfont|setmonofont|setmathfont|fontspec|newfontfamily\\s*\\\\[A-Za-z@]+|newfontface\\s*\\\\[A-Za-z@]+|setfontfamily\\s*\\\\[A-Za-z@]+)\\s*(?:\\[[^\\]]*\\]\\s*)?\\{\\s*)${name}(\\s*\\})`, "g");
-  return Object.fromEntries(Object.entries(files).map(([p, t]) => [p, /\.(tex|cls|sty)$/.test(p) ? t.replace(re, `$1${to}$2`) : t]));
-}
+// The fonts' stand-ins are shared with the compile service.
+export { METRIC_COMPATIBLE, substituteFont } from "@resume-studio/tex-service";
 
 /** Fonts this machine turned out not to have (for the life of the process). */
 const missingFonts = new Set<string>();
@@ -119,6 +106,62 @@ export function latexmkVerifier(options: LatexmkOptions = {}): BuildVerifier {
     },
     editAt: (draft, err) => latexAdapter.editAt(draft, err),
   };
+}
+
+// ---- The compile service -----------------------------------------------------------------------------------
+
+export interface TexServiceVerifierOptions extends LatexmkOptions {
+  /** The compile service, e.g. http://127.0.0.1:4380 (see packages/tex-service). */
+  url: string;
+  token?: string;
+}
+
+const BUILD_OUTPUT = /\.(aux|log|out|fls|fdb_latexmk|synctex\.gz|xdv|toc|bbl|blg|bcf|run\.xml)$/;
+const ENGINE_OF = { "-pdf": "pdflatex", "-xelatex": "xelatex", "-lualatex": "lualatex" } as const;
+
+/**
+ * A BuildVerifier that compiles drafts on the compile service (TeX Live in a container) instead of a local
+ * TeX installation. Drafts of one verifier share a project there, so each build uploads only what changed.
+ */
+export function texServiceVerifier(options: TexServiceVerifierOptions): BuildVerifier {
+  const service = createTexServiceClient({ url: options.url, token: options.token });
+  const project = `tailor-${randomBytes(8).toString("hex")}`;
+  const timeoutMs = options.timeoutMs ?? 120_000;
+  return {
+    async build(source, { maxPages, signal }): Promise<BuildCheck> {
+      // The resume folder's other files (images, fonts, classes), without what an earlier build left there.
+      const include = (p: string, n: string) => !n.startsWith(".") && n !== "node_modules" && !(p in source.files) && !BUILD_OUTPUT.test(n);
+      const assets = options.assetsDir && existsSync(options.assetsDir) ? await folderEntries(options.assetsDir, include) : [];
+      await service.sync(project, [...assets, ...memoryEntries(source.files)], signal);
+      const r = await service.compile(project, { main: source.main, engine: ENGINE_OF[latexEngine(source)], force: true, haltOnError: true, timeoutMs }, signal);
+      if (r.code !== 0 || !r.pdf) {
+        const errors = [...(r.log ?? "").matchAll(/^(?:\.\/)?([^:\n]+\.(?:tex|cls|sty)):(\d+): (.*)$/gm)].map((m) => ({ file: m[1], line: Number(m[2]), message: m[3] }));
+        return { ok: false, pages: null, errors: errors.length ? errors : [{ message: (r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ") || "The draft didn't compile" }] };
+      }
+      const pdf = Buffer.from(r.pdf, "base64");
+      const { text, info } = await service.inspectPdf(pdf, { text: true, info: true });
+      const pages = Number(/Pages:\s+(\d+)/.exec(info?.stdout ?? "")?.[1]) || null;
+      let overflowLines: number | undefined;
+      if (maxPages && pages && pages > maxPages) {
+        const extra = await service.inspectPdf(pdf, { text: true, first: maxPages + 1, last: pages });
+        overflowLines = (extra.text?.stdout ?? "").split("\n").filter((l) => l.trim()).length;
+      }
+      return { ok: true, pages, text: text?.stdout, overflowLines, errors: [] };
+    },
+    editAt: (draft, err) => latexAdapter.editAt(draft, err),
+  };
+}
+
+/**
+ * The verifier for this machine: the compile service when TAILOR_TEX_SERVICE_URL is set or TeX isn't
+ * installed here (at its default address), otherwise local latexmk.
+ */
+export function defaultVerifier(options: LatexmkOptions = {}, env: NodeJS.ProcessEnv = process.env): BuildVerifier {
+  const url = env.TAILOR_TEX_SERVICE_URL;
+  if (url) return texServiceVerifier({ ...options, url, token: env.TAILOR_TEX_SERVICE_TOKEN || undefined });
+  const hasLatexmk = [...(env.PATH ?? "").split(delimiter), ...EXTRA_PATH].some((d) => d && existsSync(join(d, "latexmk")));
+  if (hasLatexmk) return latexmkVerifier(options);
+  return texServiceVerifier({ ...options, url: `http://127.0.0.1:${DEFAULT_PORT}`, token: env.TAILOR_TEX_SERVICE_TOKEN || undefined });
 }
 
 // ---- Resume folders on disk ---------------------------------------------------------------------------------
