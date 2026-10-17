@@ -144,3 +144,17 @@ test("a managed service proves its platform, not the other way round", () => {
   const reverse = edit("e3", { op: "rewrite_skills", target: "s1", text: "TypeScript, Go, GKE" });
   assert.match(checkEdits([reverse], ix, profile, {}).failed[0].issues.join(), /Google Kubernetes Engine/);
 });
+
+test("fit: must-have coverage, weak counts half, missing years or degree caps it", async () => {
+  const { assessFit } = await import("./fit.ts");
+  const req = (id: string, kind: "must" | "nice", category = "language") => ({ id, text: id, kind, category, keywords: [] }) as JobProfile["requirements"][number];
+  const p = (reqs: JobProfile["requirements"]) => ({ ...profile, requirements: reqs });
+  const m = (pairs: [string, "strong" | "weak" | "missing"][]) => pairs.map(([requirementId, status]) => ({ requirementId, status, evidence: [], note: "" }));
+  const four = [req("a", "must"), req("b", "must"), req("c", "must"), req("d", "must"), req("n", "nice")];
+  assert.equal(assessFit(p(four), m([["a", "strong"], ["b", "strong"], ["c", "strong"], ["d", "weak"], ["n", "missing"]])).level, "strong");
+  assert.equal(assessFit(p(four), m([["a", "strong"], ["b", "weak"], ["c", "missing"], ["d", "missing"]])).level, "long-shot");
+  assert.equal(assessFit(p(four), m([["a", "strong"], ["b", "strong"], ["c", "missing"], ["d", "missing"]])).level, "stretch");
+  const years = [req("a", "must"), req("b", "must"), req("c", "must"), req("y", "must", "experience")];
+  const f = assessFit(p(years), m([["a", "strong"], ["b", "strong"], ["c", "strong"], ["y", "missing"]]));
+  assert.deepEqual([f.level, f.hardGap, f.gaps], ["stretch", true, ["y"]], "75% covered, but the years requirement is missing");
+});
