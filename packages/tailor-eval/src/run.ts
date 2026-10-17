@@ -35,6 +35,10 @@ export interface CaseResult {
     strongAfter: number;
     requirements: number;
   };
+  /** What the engine did, kept so a result can be explained: its plan, every edit, and both texts. */
+  strategy?: string;
+  edits?: { id: string; op: string; target: string; before: string | null; after: string | null; reason: string; status?: string; issues?: string[] }[];
+  texts?: { original: string; tailored: string };
   audit?: Audit;
   /** Each version screened on its own, in a fresh context: would a recruiter advance it? */
   screen?: { original: Screen; tailored: Screen };
@@ -105,6 +109,18 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
 
   const before = r?.before.build?.text;
   const after = r?.after.build?.text;
+  result.strategy = s.strategy;
+  result.edits = edits.map((e) => ({
+    id: e.id,
+    op: e.change.op,
+    target: e.change.target,
+    before: originalText(s, e.change.target),
+    after: "text" in e.change ? e.change.text : e.change.op === "reorder_bullets" ? e.change.order.join(", ") : null,
+    reason: e.reason,
+    status: e.status,
+    issues: e.issues,
+  }));
+  if (before && after) result.texts = { original: before, tailored: after };
   if (s.status === "ready" && before && after) {
     deps.onStep?.("Auditing truthfulness");
     result.audit = await auditTruthfulness(deps.judgeLLM, before, after, deps.signal);
@@ -116,4 +132,20 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
   }
   result.finishedAt = new Date().toISOString();
   return result;
+}
+
+/** The text an edit's target had before (a bullet, the headline, a skills line, the summary). */
+function originalText(s: Session, target: string): string | null {
+  const doc = s.doc;
+  if (!doc) return null;
+  if (doc.headline?.id === target) return doc.headline.text;
+  for (const sec of doc.sections) {
+    if (sec.paragraph?.id === target) return sec.paragraph.text;
+    for (const k of sec.skills) if (k.id === target) return `${k.label ? `${k.label}: ` : ""}${k.text}`;
+    for (const l of sec.lists) {
+      if (l.id === target) return l.heading;
+      for (const b of l.bullets) if (b.id === target) return b.text;
+    }
+  }
+  return null;
 }
