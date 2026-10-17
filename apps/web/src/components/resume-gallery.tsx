@@ -127,10 +127,6 @@ export function ResumeGallery() {
             <Button size="sm" variant="ghost" aria-label="AI providers" title="AI providers" onClick={() => setAiSettings(true)}>
               <Settings2 />
             </Button>
-            <Button size="sm" nativeButton={false} render={<Link href="/tailor/new" />}>
-              <Sparkles />
-              Tailor for a job
-            </Button>
           </div>
         </div>
       </header>
@@ -233,7 +229,18 @@ export function ResumeGallery() {
                     </p>
                   </div>
                 </Link>
-                <div className="absolute top-4 right-4 opacity-0 transition-opacity group-hover:opacity-100 has-aria-expanded:opacity-100">
+                <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 has-aria-expanded:opacity-100">
+                  <Button
+                    variant="secondary"
+                    size="xs"
+                    className="shadow-sm"
+                    nativeButton={false}
+                    render={<Link href={`/tailor/new?resume=${encodeURIComponent(r.id)}`} />}
+                    title={`Tailor “${r.name}” for a job posting`}
+                  >
+                    <Sparkles />
+                    Tailor
+                  </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger render={<Button variant="secondary" size="icon-xs" aria-label="Resume actions" className="shadow-sm" />}>
                       <MoreHorizontal />

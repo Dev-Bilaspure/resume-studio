@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -211,7 +212,21 @@ export function NewTailoring({ resumeId }: { resumeId: string | null }) {
 
   return (
     <div className="min-h-dvh bg-[radial-gradient(60rem_26rem_at_50%_-10rem,var(--glow),transparent_70%)] bg-no-repeat">
-      <TailorHeader crumbs={<span className="font-medium">Tailor for a job</span>} />
+      <TailorHeader
+        crumbs={
+          <>
+            {baseResume && (
+              <>
+                <Link href={`/r/${encodeURIComponent(baseResume.id)}`} className="truncate text-muted-foreground hover:text-foreground">
+                  {baseResume.name}
+                </Link>
+                <span className="text-muted-foreground/50">/</span>
+              </>
+            )}
+            <span className="shrink-0 font-medium">Tailor for a job</span>
+          </>
+        }
+      />
       <form onSubmit={submit} className="mx-auto grid max-w-6xl gap-8 px-6 py-8 lg:grid-cols-[1fr_20rem]">
         <div className="min-w-0 space-y-6">
           <div>
@@ -322,7 +337,7 @@ export function NewTailoring({ resumeId }: { resumeId: string | null }) {
 
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <section className="rounded-xl border bg-card p-4">
-            <Label className="mb-2 block">Start from</Label>
+            <Label className="mb-2 block">Resume to tailor</Label>
             {resumes === null ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : resumes.length === 0 ? (
