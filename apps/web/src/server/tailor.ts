@@ -280,6 +280,8 @@ export async function previewSession(
   const pdf = v.lastPdf();
   if (!pdf) return { pdf: "", pages: null, atsScore: null, errors: check.errors.map((e) => e.message) };
   const name = `preview-${Date.now()}.pdf`;
+  // The session's own folder is gone after finalizing (and absent for a session restored from disk).
+  await mkdir(workDir(id), { recursive: true });
   await copyFile(pdf, join(workDir(id), name));
   await keepNewestPdfs(workDir(id));
   await keepNewestPdfs(workDir(`${id}-preview`));
