@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // resume-tailor: tailors a LaTeX resume to a job description from the command line.
 //   resume-tailor <resume-dir> --jd jd.txt --company Acme --role "Backend Engineer" [--main main.tex]
 //     [--seniority mid] [--provider claude-code] [--model opus] [--out tailored.tex] [--sessions dir]

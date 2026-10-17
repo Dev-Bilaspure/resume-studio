@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // resume-tailor-mcp: the MCP server over stdio, for assistants on this computer (Claude Desktop, Claude Code…).
 // Model: the first provider the environment has credentials for (ANTHROPIC_API_KEY, OPENAI_API_KEY,
 // GOOGLE_VERTEX_PROJECT + GOOGLE_VERTEX_LOCATION), else your Claude Code login. TAILOR_PROVIDER and

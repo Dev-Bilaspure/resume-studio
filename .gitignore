@@ -53,3 +53,6 @@ next-env.d.ts
 # Evaluation data (job postings, resumes) and results: local only
 /eval-data/
 /eval-results/
+
+# Package builds
+packages/*/dist/

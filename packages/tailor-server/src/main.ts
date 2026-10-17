@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // Starts the tailoring service from environment variables (see README.md).
 import { configFromEnv } from "./config.ts";
 import { createTailorServer } from "./server.ts";

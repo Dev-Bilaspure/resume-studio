@@ -6,9 +6,19 @@
   "bin": {
     "resume-tailor-mcp": "./bin/resume-tailor-mcp.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "bin": {
+      "resume-tailor-mcp": "./dist/main.js"
+    }
+  },
   "scripts": {
     "typecheck": "tsc -p .",
-    "test": "node --experimental-strip-types --no-warnings --test 'src/**/*.test.ts'"
+    "test": "node --experimental-strip-types --no-warnings --test 'src/**/*.test.ts'",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@resume-studio/llm": "workspace:*",
