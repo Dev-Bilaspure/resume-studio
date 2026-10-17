@@ -218,14 +218,23 @@ export async function getSession(id: string): Promise<Session & { running: boole
 
 export async function listSessions(
   resumeId?: string,
-): Promise<(Pick<Session, "id" | "status" | "createdAt" | "updatedAt" | "job" | "context"> & { interrupted: boolean })[]> {
+): Promise<(Pick<Session, "id" | "status" | "createdAt" | "updatedAt" | "job" | "context"> & { interrupted: boolean; fit?: Session["fit"] })[]> {
   void pruneOnce();
   const files = await readdir(SESSIONS_DIR).catch(() => [] as string[]);
   const out = [];
   for (const f of files.filter((x) => x.endsWith(".json"))) {
     const s = await sessionStore.get(f.replace(/\.json$/, ""));
     if (!s || (resumeId && s.context.resumeId !== resumeId)) continue;
-    out.push({ id: s.id, status: s.status, createdAt: s.createdAt, updatedAt: s.updatedAt, job: s.job, context: s.context, interrupted: isInterrupted(s) });
+    out.push({
+      id: s.id,
+      status: s.status,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+      job: s.job,
+      context: s.context,
+      interrupted: isInterrupted(s),
+      fit: s.fit,
+    });
   }
   return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }

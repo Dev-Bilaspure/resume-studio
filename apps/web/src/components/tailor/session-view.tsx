@@ -11,6 +11,7 @@ import { formatDuration } from "@/lib/format";
 import { jobCompany, jobTitle, tailorApi, type SessionView as Session } from "@/lib/tailor-api";
 import { useServerEvents } from "@/lib/use-events";
 import { cn } from "@/lib/utils";
+import { FitCard } from "./fit-card";
 import { Review } from "./review";
 import { TailorHeader } from "./tailor-header";
 
@@ -210,7 +211,8 @@ function Progress({ session }: { session: Session }) {
           )}
         </section>
 
-        <section className="min-w-0">
+        <section className="min-w-0 space-y-4">
+          {session.fit && <FitCard fit={session.fit} />}
           {session.profile ? (
             <div className="rounded-xl border bg-card p-5">
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">What this role needs</p>

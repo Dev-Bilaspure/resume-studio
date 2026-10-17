@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { editContext, elementText, jobTitle, plainText, tailorApi, wordDiff, type PreviewResult, type SessionView } from "@/lib/tailor-api";
 import { cn } from "@/lib/utils";
 import { FactsDialog } from "./facts-dialog";
+import { FitCard } from "./fit-card";
 import { MatchDot } from "./session-view";
 
 const OP_LABEL: Record<Edit["change"]["op"], string> = {
@@ -116,6 +117,7 @@ export function Review({ session }: { session: SessionView }) {
       <div className={cn("min-h-0 flex-col border-r lg:flex", pane === "pdf" ? "hidden" : "flex")}>
         <div className="min-h-0 flex-1 overflow-y-auto">
           <div className="space-y-5 px-6 py-6">
+            {session.fit && <FitCard fit={session.fit} />}
             {report && <Scoreboard session={session} preview={preview} />}
 
             {session.strategy && (
