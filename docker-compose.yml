@@ -4,8 +4,8 @@
 #   docker compose up -d        start it (the first build downloads TeX Live, a few GB)
 #   pnpm dev                    run the app; it uses the service when TeX isn't installed here
 #
-# Optional: the tailoring engine as a standalone HTTP service (for use outside the app, with API keys):
-#   TAILOR_API_KEY=… ANTHROPIC_API_KEY=… docker compose --profile engine up -d
+# This is all the app needs: the app itself, and the tailoring engine inside it, run with `pnpm dev`.
+# (To run the engine as a separate HTTP service, without the app, see packages/tailor-server/README.md.)
 
 name: resume-studio
 
@@ -35,30 +35,5 @@ services:
     restart: unless-stopped
     stop_grace_period: 15s
 
-  engine:
-    profiles: [engine]
-    build:
-      context: .
-      dockerfile: packages/tailor-server/Dockerfile
-    image: resume-studio-tailor:latest
-    ports:
-      - "127.0.0.1:${TAILOR_PORT:-8787}:8787"
-    environment:
-      TAILOR_API_KEY: ${TAILOR_API_KEY:-}
-      TAILOR_PROVIDER: ${TAILOR_PROVIDER:-}
-      TAILOR_MODEL: ${TAILOR_MODEL:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      GOOGLE_VERTEX_PROJECT: ${GOOGLE_VERTEX_PROJECT:-}
-      GOOGLE_VERTEX_LOCATION: ${GOOGLE_VERTEX_LOCATION:-}
-    volumes:
-      - tailor-data:/data
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    init: true
-    restart: unless-stopped
-
 volumes:
   tex-data:
-  tailor-data:
