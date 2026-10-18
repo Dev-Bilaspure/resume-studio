@@ -10,12 +10,13 @@ import {
   type Answer,
   type BuildCheck,
   type BuildVerifier,
+  type Fact,
   type JobInput,
   type Session,
   type SourceFiles,
   type TailorOptions,
 } from "@resume-studio/tailor";
-import { fileFactStore, fileSessionStore } from "@resume-studio/tailor/node";
+import { CorruptFileError, fileFactStore, fileSessionStore } from "@resume-studio/tailor/node";
 import { latexAdapter } from "@resume-studio/tailor-latex";
 import type { ResumeMeta } from "@/lib/types";
 import { resolveProvider } from "./ai-config";
@@ -223,7 +224,11 @@ export async function listSessions(
   const files = await readdir(SESSIONS_DIR).catch(() => [] as string[]);
   const out = [];
   for (const f of files.filter((x) => x.endsWith(".json"))) {
-    const s = await sessionStore.get(f.replace(/\.json$/, ""));
+    // A damaged session file is left out of the list (opening it reports the damage).
+    const s = await sessionStore.get(f.replace(/\.json$/, "")).catch((e) => {
+      if (e instanceof CorruptFileError) return null;
+      throw e;
+    });
     if (!s || (resumeId && s.context.resumeId !== resumeId)) continue;
     out.push({
       id: s.id,
@@ -359,8 +364,8 @@ export async function readFacts() {
   return factStore.list();
 }
 
-export async function writeFacts(facts: { id: string; text: string; skills: string[]; source: "answer" | "manual" | "import"; createdAt: string }[]) {
-  await atomicWrite(FACTS_FILE, JSON.stringify({ facts }, null, 2) + "\n");
+export async function writeFacts(facts: Fact[]) {
+  await factStore.replace(facts);
 }
 
 export function factsFileExists() {
@@ -386,7 +391,11 @@ export async function pruneTailorState(now = Date.now()) {
   const ids = new Set<string>();
   for (const f of await readdir(SESSIONS_DIR).catch(() => [] as string[])) {
     if (!f.endsWith(".json")) continue;
-    const s = await sessionStore.get(f.replace(/\.json$/, ""));
+    // A damaged session is kept as it is (for whoever looks into it), not pruned or read further.
+    const s = await sessionStore.get(f.replace(/\.json$/, "")).catch((e) => {
+      if (e instanceof CorruptFileError) return null;
+      throw e;
+    });
     if (!s || running.has(s.id)) {
       if (s) ids.add(s.id);
       continue;
