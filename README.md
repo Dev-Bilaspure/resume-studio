@@ -154,7 +154,9 @@ original is never changed; the posting is kept with it as `jd.md`).
 It never invents experience. Every new claim has to trace back to your resume or to an answer you gave:
 new numbers are refused outright, a technology may only appear where its evidence names it, a second
 model fact-checks every change, and the draft is compiled to prove it builds and fits the page. Answers
-you give become facts (`resumes/_profile/facts.json`) that later applications can use.
+you give become facts (`resumes/_profile/facts.json`) that later applications can use; a "haven't done
+this" is kept too, so it isn't asked again and nothing implies it. Suggestions the checks leave out are
+listed in the review with the reason. Your on/off choices are kept until you save.
 
 The model is your choice under **AI providers**: your Claude Code login (no key needed), the Anthropic
 API, OpenAI or Google Vertex AI. Keys are kept in the macOS Keychain (on Linux and Windows, in
