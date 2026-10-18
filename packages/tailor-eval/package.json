@@ -1,0 +1,23 @@
+{
+  "name": "@resume-studio/tailor-eval",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tailor-eval": "./bin/tailor-eval.js"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "node --experimental-strip-types --no-warnings --test 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "@resume-studio/llm": "workspace:*",
+    "@resume-studio/tailor": "workspace:*",
+    "@resume-studio/tailor-latex": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-/node_modules
+node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,14 +11,14 @@
 !.yarn/versions
 
 # testing
-/coverage
+coverage/
 
 # next.js
-/.next/
-/out/
+.next/
+out/
 
 # production
-/build
+build/
 
 # misc
 .DS_Store
@@ -41,8 +41,22 @@ yarn-error.log*
 next-env.d.ts
 
 # PDF.js runtime assets (copied from node_modules by scripts/copy-pdfjs.mjs)
-/public/pdfjs/
+/apps/web/public/pdfjs/
 
 # Your resumes and the app's state (builds, snapshot history). Personal data, never committed to the app repo.
 /resumes/
 /.resume-studio/
+
+# turborepo
+.turbo/
+
+# Evaluation data (job postings, resumes) and results: local only
+/eval-data/
+/eval-results/
+
+# Package builds
+packages/*/dist/
+/samples
+
+# The compile service run without Docker keeps its projects here.
+tex-service-data/

@@ -1,0 +1,39 @@
+# Resume Studio's compile service: TeX Live, latexmk, SyncTeX and poppler in a container, so the app
+# builds resumes the same way on macOS, Linux and Windows without installing TeX.
+#
+#   docker compose up -d        start it (the first build downloads TeX Live, a few GB)
+#   pnpm dev                    run the app; it uses the service when TeX isn't installed here
+#
+# This is all the app needs: the app itself, and the tailoring engine inside it, run with `pnpm dev`.
+# (To run the engine as a separate HTTP service, without the app, see packages/tailor-server/README.md.)
+
+name: resume-studio
+
+services:
+  tex:
+    build:
+      context: .
+      dockerfile: packages/tex-service/Dockerfile
+    image: resume-studio-tex:latest
+    # Loopback only: the service runs TeX on whatever it's sent, so only this machine may reach it.
+    ports:
+      - "127.0.0.1:${TEX_SERVICE_PORT:-4380}:4380"
+    environment:
+      TEX_SERVICE_TOKEN: ${TEX_SERVICE_TOKEN:-}
+      TEX_SERVICE_CONCURRENCY: ${TEX_SERVICE_CONCURRENCY:-}
+    volumes:
+      - tex-data:/data
+    tmpfs:
+      - /tmp
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    # Reaps the processes TeX starts (latexmk → xelatex → biber) and passes signals on.
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+volumes:
+  tex-data:

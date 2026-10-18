@@ -1,0 +1,31 @@
+{
+  "name": "@resume-studio/tailor-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "resume-tailor": "./bin/resume-tailor.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "bin": {
+      "resume-tailor": "./dist/cli.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@resume-studio/llm": "workspace:*",
+    "@resume-studio/tailor": "workspace:*",
+    "@resume-studio/tailor-latex": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}

@@ -2,18 +2,56 @@
 
 A local LaTeX resume editor: code on the left, the real PDF on the right, rebuilt on every save, with a
 built-in ATS (applicant tracking system) check of what a parser actually extracts from your PDF.
-Everything runs on this Mac; your resumes are plain `.tex` files you own.
+Everything runs on your computer; your resumes are plain `.tex` files you own.
 
 ## Setup
 
+You need Node 24 and pnpm, and TeX: either the compile service in Docker (nothing else to install, same
+on macOS, Linux and Windows) or TeX Live on this machine.
+
 ```sh
-brew install --cask mactex-no-gui   # full TeX Live (same as Overleaf); needs your password
-brew install poppler                # pdftotext/pdffonts/pdfinfo for the ATS check
+docker compose up -d                # the compile service: TeX Live 2026, latexmk, poppler (first run downloads a few GB)
 pnpm install
 pnpm dev                            # http://127.0.0.1:4317
 ```
 
+Then pick a model under **AI providers** (home page, ⚙) for tailoring: your Claude Code login, or an API
+key for Anthropic, OpenAI or Vertex AI.
+
+Without Docker, install TeX on this machine instead; the app uses it when it's there:
+
+```sh
+brew install --cask mactex-no-gui   # macOS: full TeX Live (same as Overleaf); needs your password
+brew install poppler                # pdftotext/pdffonts/pdfinfo for the ATS check
+```
+
+(Linux: TeX Live's installer or `texlive-full`, and `poppler-utils`.) `RESUME_STUDIO_COMPILER=local` or
+`service` in `apps/web/.env.local` pins the choice; see [the compile service](packages/tex-service/README.md).
+On Windows, run the app in WSL 2.
+
 Production mode: `pnpm build && pnpm start`. The server only answers on 127.0.0.1.
+
+## Repo layout
+
+A pnpm workspace; [Turborepo](https://turborepo.com) runs `build`, `typecheck`, `test` and `lint` across
+it in dependency order (`pnpm typecheck`, `pnpm test` from the root).
+
+```
+apps/web/                 the editor (Next.js): app, compiler, templates
+packages/tex-service/     the compile service: TeX Live in a container, its HTTP API and client
+packages/llm/             one interface over Claude Code, OpenAI, Anthropic and Vertex AI
+packages/tailor/          the job-tailoring engine (format-neutral)
+packages/tailor-latex/    the engine's LaTeX adapter
+packages/tailor-cli/      `resume-tailor`: tailoring from the command line
+packages/tailor-server/   the engine as an HTTP service (Docker image included)
+packages/tailor-mcp/      the engine as an MCP server, for Claude Desktop and other assistants
+packages/tailor-eval/     measures tailoring quality: blind recruiter screens and a truthfulness audit
+```
+
+Packages depend one way only (tex-service, llm ← tailor ← tailor-latex ← cli/server/mcp/eval/web): a cycle makes
+pnpm link the packages into each other endlessly, and the bundler walks that loop until it runs out of
+memory. In the repo they run from TypeScript source; `pnpm build` also compiles them to `dist/`, which is
+what a packed or published copy uses.
 
 ## Where things live
 
@@ -48,8 +86,9 @@ Not here: real-time collaboration, comments/track changes and the rich-text visu
 `fontspec`/`unicode-math`/`polyglossia` in the preamble *or in the project's own .cls/.sty* → XeLaTeX;
 Lua code → LuaLaTeX; PSTricks → LaTeX (DVI). XeLaTeX on macOS can only find fonts installed in macOS
 by name, not the ones in TeX Live (Roboto, Source Sans 3, Lato…) that Overleaf's Linux XeLaTeX finds;
-documents that ask for such fonts are built with LuaLaTeX, which finds them, unless they load XeTeX-only
-packages. The build's info note and the status bar say when this happened.
+with TeX on this Mac, documents that ask for such fonts are built with LuaLaTeX, which finds them, unless
+they load XeTeX-only packages. The build's info note and the status bar say when this happened. The
+compile service is Linux, set up like Overleaf: its XeLaTeX finds them.
 
 **Like Overleaf's compile servers**, TeX runs in the main file's folder (`latexmk -cd`) and carries on past
 errors (`latexmk -f`) unless "Stop on first error" is on. BibTeX/biber problems from the `.blg` (bad
@@ -60,15 +99,16 @@ Tested with Jake's Resume, Awesome-CV, Deedy, moderncv and AltaCV as they ship o
 without errors.
 
 **Trusted projects.** Overleaf runs every project with shell escape inside a sandbox. Here, a `.tex`
-file runs on your Mac, so by default TeX gets its *restricted* shell escape (only vetted helpers such as
+file runs on your computer (or in the compile service's container), so by default TeX gets its *restricted* shell escape (only vetted helpers such as
 `epstopdf`) and a project's `latexmkrc` is ignored. Settings → Compiler → **Trusted project** enables
 `-shell-escape` (minted, svg, gnuplot) and the project `latexmkrc` for projects you trust.
 
 ## How it works
 
 - **Compile**: `latexmk` with pdfLaTeX, XeLaTeX, LuaLaTeX or LaTeX → DVI → PDF (per resume, or
-  `% !TEX program = xelatex` in the main file). Like Overleaf's compile servers, a build runs in a mirror
-  of the project under `.resume-studio/build/`, so every helper sees relative paths, TeX's write
+  `% !TEX program = xelatex` in the main file), on this machine or in the compile service (the same
+  command line either way; the service gets only the files that changed). Like Overleaf's compile
+  servers, a build runs in a mirror of the project (`.resume-studio/build/`, or the service's volume), so every helper sees relative paths, TeX's write
   protection stays on and generated files never land in your folder. Builds are incremental, coalesced
   while you type (never killed half-way) and time out after 120 s. Each build's PDF is published
   atomically under a new id, so the preview never sees a half-written file.
@@ -102,6 +142,42 @@ order and physical layout) and checked:
 The templates (Classic, Modern, Blank) pass every check: T1 fonts with `glyphtounicode`, f-ligatures
 off, no hyphenation, unbreakable contact items, and entries that read left to right with inline dates.
 
+## Tailoring for a job
+
+**Tailor** (on a resume's card on the home page, or in the editor's top bar) takes a job posting and makes a tailored copy of
+a resume. The engine reads the posting (requirements, must-have keywords, level, hard filters), matches
+each requirement to your bullets and saved facts, asks about must-haves your resume doesn't show, then
+rewrites the relevant parts in the job's language. You review every change as a diff with its reason and
+evidence, watch the PDF update as you accept or reject, and save the result as a new resume (the
+original is never changed; the posting is kept with it as `jd.md`).
+
+It never invents experience. Every new claim has to trace back to your resume or to an answer you gave:
+new numbers are refused outright, a technology may only appear where its evidence names it, a second
+model fact-checks every change, and the draft is compiled to prove it builds and fits the page. Answers
+you give become facts (`resumes/_profile/facts.json`) that later applications can use; a "haven't done
+this" is kept too, so it isn't asked again and nothing implies it. Suggestions the checks leave out are
+listed in the review with the reason. Your on/off choices are kept until you save.
+
+The model is your choice under **AI providers**: your Claude Code login (no key needed), the Anthropic
+API, OpenAI or Google Vertex AI. Keys are kept in the macOS Keychain (on Linux and Windows, in
+`.resume-studio/secrets.json`, readable only by your user).
+
+The same engine also runs outside the app:
+
+```sh
+pnpm tailor resumes/my-cv --jd posting.txt --company Acme --role "Backend Engineer" --out resumes/my-cv-acme
+TAILOR_ENABLE_CLAUDE_CODE=1 node packages/tailor-server/src/main.ts     # HTTP API, see its README
+node packages/tailor-mcp/bin/resume-tailor-mcp.js                       # MCP server, see its README
+```
+
+**Measuring it.** `pnpm eval run --model opus --judge-model opus` tailors each resume in
+`eval-data/resumes/` for each job posting in `eval-data/jds/` (pairs in `eval-data/cases.json`), then has
+an independent judge (a) audit the tailored text against the original for anything unsupported and
+(b) screen the original and the tailored resume each on its own, as a recruiter. The report
+(`eval-results/<run>/report.md`) shows how often the tailored resume is the one advanced, the fit change,
+and every truthfulness issue. Runs resume where they stopped (e.g. after a usage limit). The data and
+results stay on your machine.
+
 ## Shortcuts
 
 | | |
@@ -117,10 +193,10 @@ off, no hyphenation, unbreakable contact items, and entries that read left to ri
 ## Development
 
 ```sh
-pnpm test        # log parser, ATS checks, SyncTeX parsing, engine detection
+pnpm test        # log parser, ATS checks, SyncTeX, engine detection, the compile service, the engine
 pnpm typecheck
 pnpm lint
 ```
 
-Server code is in `src/server/` (compiler, log parser, ATS checks, SyncTeX, snapshots, file watcher),
-the API in `src/app/api/`, the UI in `src/components/`.
+Server code is in `apps/web/src/server/` (compiler, log parser, ATS checks, SyncTeX, snapshots, file watcher),
+the API in `apps/web/src/app/api/`, the UI in `apps/web/src/components/`.

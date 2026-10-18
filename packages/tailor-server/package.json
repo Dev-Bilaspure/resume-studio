@@ -1,0 +1,48 @@
+{
+  "name": "@resume-studio/tailor-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/server.ts",
+    "./config": "./src/config.ts"
+  },
+  "bin": {
+    "tailor-server": "./bin/tailor-server.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/server.d.ts",
+        "default": "./dist/server.js"
+      },
+      "./config": {
+        "types": "./dist/config.d.ts",
+        "default": "./dist/config.js"
+      }
+    },
+    "bin": {
+      "tailor-server": "./dist/main.js"
+    }
+  },
+  "scripts": {
+    "start": "node src/main.ts",
+    "typecheck": "tsc -p .",
+    "test": "node --experimental-strip-types --no-warnings --test 'src/**/*.test.ts'",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@resume-studio/llm": "workspace:*",
+    "@resume-studio/tailor": "workspace:*",
+    "@resume-studio/tailor-latex": "workspace:*",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}
