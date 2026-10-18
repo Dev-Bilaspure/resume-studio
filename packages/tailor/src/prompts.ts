@@ -240,7 +240,7 @@ export function editsPrompt(args: {
   const { doc, facts, job, profile, matches, opts, currentPages } = args;
   const budget = opts.maxPages ?? currentPages;
   const rules = [
-    `- Edit operations: rewrite_bullet, remove_bullet, add_bullet (only with a fact or another bullet as evidence), reorder_bullets (within one entry; list every bullet id of the entry), rewrite_paragraph (the summary), rewrite_skills (one skills line: reorder, use the job's spellings${opts.allowNewSkills === false ? "" : ", add skills proven by facts"}, drop irrelevant ones if space is short; keep its label)${opts.allowHeadline === false ? "" : ', set_headline (the role line under the name: the target title or a truthful variant of it; don\'t claim a level the experience doesn\'t support, and name the job\'s own specialty or none: not "Backend" for a full-stack role)'}.`,
+    `- Edit operations: rewrite_bullet, remove_bullet, add_bullet (only with a fact or another bullet as evidence), reorder_bullets (within one entry; list every bullet id of the entry), rewrite_paragraph (the summary), rewrite_skills (one skills line: reorder, use the job's spellings${opts.allowNewSkills === false ? "" : ", add skills proven by facts"}, drop irrelevant ones if space is short; keep its label)${opts.allowHeadline === false ? "" : ', set_headline (the role line under the name: positioning, not a past job title, so the target title or a truthful variant of it is fine, e.g. "Backend Engineer" for a Software Engineer whose work is backend; no level the roles don\'t show (Senior, Staff, Lead…), and the job\'s own specialty or none: not "Backend" for a full-stack role)'}.`,
     "- Don't reorder entries or sections; keep reverse-chronological order. Never remove every bullet of an entry.",
     budget ? `- Page budget: ${budget} page${budget === 1 ? "" : "s"}${currentPages ? ` (currently ${currentPages})` : ""}. Added text must be paid for by cuts.` : "",
     "- Only edit what improves the fit. Untouched is fine. Don't rewrite a bullet just to change words.",
@@ -273,12 +273,14 @@ export const JudgeSchema = z.object({
   ),
 });
 
-export function judgePrompt(items: { id: string; before: string; after: string; evidence: string[] }[]) {
+export function judgePrompt(items: { id: string; before: string; after: string; evidence: string[]; headline?: boolean }[]) {
   return {
     system: `You are a meticulous fact-checker for resumes. For each edit, compare the new text with its evidence (the original text and cited sources). A claim is unsupported if the evidence doesn't state it: a technology, number, scope, team size, ownership level ("led", "owned", "architected") or outcome that isn't there. It is also unsupported when a real number or outcome is credited to different work than in the evidence (the evidence credits a 60% gain to the pipeline's design; the edit credits it to running it on Kubernetes). Rephrasing, reordering and using a job's terminology for the same thing are fine. Be strict about substance and relaxed about wording.
+
+A HEADLINE edit is the line under the candidate's name: positioning (what they are, in the job's words), not a past job title. Judge it against the roles listed as evidence: a role name their work supports is fine even if their titles were worded differently ("Backend Engineer" or "Software Development Engineer" for a Software Engineer who did backend work). It is unsupported only if it claims a level no role shows (Senior, Staff, Lead, Principal, Manager…) or a specialty their work doesn't show.
 ${DATA_NOTE}`,
     prompt: items
-      .map((i) => `<edit id="${i.id}">\nBEFORE: ${i.before || "(new)"}\nAFTER: ${i.after}\nEVIDENCE:\n${i.evidence.map((e) => `- ${e}`).join("\n") || "- (none cited)"}\n</edit>`)
+      .map((i) => `<edit id="${i.id}"${i.headline ? ' kind="headline"' : ""}>\nBEFORE: ${i.before || "(new)"}\nAFTER: ${i.after}\nEVIDENCE:\n${i.evidence.map((e) => `- ${e}`).join("\n") || "- (none cited)"}\n</edit>`)
       .join("\n\n"),
   };
 }

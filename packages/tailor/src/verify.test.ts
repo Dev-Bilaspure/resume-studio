@@ -4,7 +4,7 @@ import { addedBulletId, applyToDoc, mergeFitEdits } from "./doc.ts";
 import { mentions, techTerms } from "./lexicon.ts";
 import { markupProblems, numbers, plain, unsupportedNumbers } from "./text.ts";
 import type { Edit, Fact, JobProfile, ResumeDoc } from "./types.ts";
-import { checkEdits, indexDoc } from "./verify.ts";
+import { checkEdits, indexDoc, headlineLevelClaim } from "./verify.ts";
 
 const doc: ResumeDoc = {
   header: "Dev Example | dev@example.com",
@@ -169,4 +169,14 @@ test("a headline names the job's specialty or none", async () => {
   const ix = indexDoc(doc, []);
   const r = checkEdits([edit("e1", { op: "set_headline", target: "h1", text: "Frontend Engineer" })], ix, profile, {});
   assert.match(r.failed[0].issues.join(), /headline says frontend but the role is backend/);
+});
+
+test("a headline is positioning: a role name is fine, a level must be shown by a role", () => {
+  const roles = ["Exemplary AI, Chennai Aug 2023 – Oct 2025 Software Development Engineer", "Indihood 2021 – 2023 Software Engineer"];
+  for (const ok of ["Backend Engineer", "Software Development Engineer", "Full-Stack Engineer", "Platform Engineer"]) assert.equal(headlineLevelClaim(ok, roles), null, ok);
+  assert.equal(headlineLevelClaim("Senior Backend Engineer", roles), "Senior");
+  assert.equal(headlineLevelClaim("Staff Engineer", roles), "Staff");
+  assert.equal(headlineLevelClaim("Tech Lead", roles), "Lead");
+  assert.equal(headlineLevelClaim("Senior Engineer", ["Acme 2020 – now Sr. Software Engineer"]), null, "Sr. counts as Senior");
+  assert.equal(headlineLevelClaim("Lead Backend Engineer", ["Foo — Lead Engineer"]), null);
 });

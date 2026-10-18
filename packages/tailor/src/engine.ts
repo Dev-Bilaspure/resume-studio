@@ -242,12 +242,20 @@ export function createTailorEngine(deps: EngineDeps) {
   async function judge(s: Session, edits: Edit[], ix: ReturnType<typeof indexDoc>, signal?: AbortSignal) {
     const textual = edits.filter((e) => "text" in e.change && e.change.op !== "rewrite_skills");
     if (!textual.length) return { passed: edits, failed: [] as { edit: Edit; issues: string[] }[] };
-    const items = textual.map((e) => ({
-      id: e.id,
-      before: beforeText(ix, e.change),
-      after: "text" in e.change ? e.change.text : "",
-      evidence: [entryHeading(ix, e.change), ...e.evidence.map((r) => evidenceText(ix, r))].filter((x): x is string => !!x),
-    }));
+    const items = textual.map((e) => {
+      const headline = e.change.op === "set_headline";
+      return {
+        id: e.id,
+        headline,
+        before: beforeText(ix, e.change),
+        after: "text" in e.change ? e.change.text : "",
+        // A headline is judged against the whole experience: every role, plus what it cites.
+        evidence: [
+          ...(headline ? ix.headings.map((h) => `ROLE: ${h}`) : [entryHeading(ix, e.change)]),
+          ...e.evidence.map((r) => evidenceText(ix, r)),
+        ].filter((x): x is string => !!x),
+      };
+    });
     const out = await call(s, "fact-check", { ...judgePrompt(items), schema: JudgeSchema, schemaName: "fact_check" }, signal);
     const verdict = new Map(out.verdicts.map((v) => [v.editId, v]));
     const passed: Edit[] = [];

@@ -212,6 +212,8 @@ export function checkEdits(edits: Edit[], ix: DocIndex, profile: JobProfile, opt
       if (c.op === "set_headline") {
         const clash = specialtyClash(c.text, profile.roleFamily);
         if (clash) issues.push(`headline says ${clash.headline} but the role is ${clash.role}: name the role's own specialty, or none`);
+        const level = headlineLevelClaim(c.text, [ix.headline?.text ?? "", ...ix.headings]);
+        if (level) issues.push(`headline claims "${level}", which no role on the resume shows`);
       }
     }
 
@@ -232,6 +234,26 @@ export function checkEdits(edits: Edit[], ix: DocIndex, profile: JobProfile, opt
 function aliasesOf(profile: JobProfile, term: string): string[] {
   const k = profile.keywords.find((x) => canonical(x.term) === canonical(term));
   return k ? k.aliases : [];
+}
+
+// ---- Headline level -----------------------------------------------------------------------------------------
+
+const LEVELS = /\b(senior|sr\.?|staff|lead|principal|head|chief|manager|director|architect|vp|vice president|founding)\b/gi;
+
+/**
+ * A headline is positioning (what you are, worded the job's way), not a past job title: "Backend
+ * Engineer" for a Software Engineer who does backend work is fair. A level is different: "Senior",
+ * "Staff", "Lead"… must appear in a role the resume shows (or the current headline). Returns the first
+ * level word that doesn't.
+ */
+export function headlineLevelClaim(headline: string, experience: string[]): string | null {
+  const shown = experience.join("\n").toLowerCase();
+  for (const m of headline.matchAll(LEVELS)) {
+    const word = m[1].toLowerCase().replace(/\.$/, "");
+    const forms = word === "sr" || word === "senior" ? ["senior", "sr."] : [word];
+    if (!forms.some((f) => new RegExp(`\\b${f.replace(".", "\\.")}`).test(shown))) return m[1];
+  }
+  return null;
 }
 
 // ---- Headline specialty ------------------------------------------------------------------------------------
