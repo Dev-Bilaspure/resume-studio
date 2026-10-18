@@ -26,7 +26,8 @@ import type { Answer, BuildCheck, DropReason, Edit, Fact, JobInput, JobProfile, 
 import { beforeText, checkEdits, entryHeading, evidenceText, indexDoc, toEdit } from "./verify.ts";
 
 export const ENGINE_VERSION = "0.1.0";
-const MAX_QUESTIONS = 6;
+/** Only the questions that matter most: in the evaluation, runs asked ~6 and fewer than 4 in 10 were answerable. */
+const MAX_QUESTIONS = 4;
 const MAX_FIT_ROUNDS = 2;
 
 export interface EngineDeps {
@@ -150,10 +151,21 @@ export function createTailorEngine(deps: EngineDeps) {
   }
 
   async function learnFacts(s: Session, signal?: AbortSignal) {
+    const now = new Date().toISOString();
+    // "Haven't done this": remembered as a topic the candidate lacks, so it isn't asked again and no edit
+    // implies it. Never evidence. Written from the question, without a model call.
+    const declined: Fact[] = (s.answers ?? [])
+      .filter((a) => a.none)
+      .map((a) => s.questions?.find((q) => q.id === a.questionId))
+      .filter((q): q is Question => !!q)
+      .map((q) => ({ id: uid("f"), kind: "lacks", topic: q.topic, text: `Hasn't done this: ${q.topic}. (Asked: "${q.question}")`, skills: [], source: "answer", createdAt: now }));
+    if (declined.length) {
+      s.facts = [...s.facts, ...declined];
+      await deps.facts?.add(declined);
+    }
     const answered = (s.answers ?? []).filter((a) => !a.none && a.text?.trim());
     if (!answered.length) return;
     const out = await call(s, "learn-facts", { ...factsPrompt(s.questions ?? [], answered), schema: FactsSchema, schemaName: "facts" }, signal);
-    const now = new Date().toISOString();
     const learned: Fact[] = out.facts
       .filter((f) => f.text.trim())
       .map((f) => ({ id: uid("f"), text: f.text.trim(), skills: f.skills.map((x) => canonical(x)), source: "answer", createdAt: now }));

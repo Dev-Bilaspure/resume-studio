@@ -1,7 +1,7 @@
 "use client";
 
 import type { Fact } from "@resume-studio/tailor";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ interface Row {
   skills: string;
   source: Fact["source"];
   createdAt: string;
+  kind?: Fact["kind"];
+  topic?: string;
 }
 
 const toRow = (f: Fact): Row => ({ ...f, skills: f.skills.join(", ") });
@@ -47,6 +49,9 @@ function FactsEditor({ onDone, onSaved }: { onDone(): void; onSaved?(count: numb
   }, []);
 
   const update = (id: string, patch: Partial<Row>) => setRows((r) => r!.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  const remove = (id: string) => setRows((x) => x!.filter((y) => y.id !== id));
+  const has = rows?.filter((r) => r.kind !== "lacks") ?? [];
+  const lacks = rows?.filter((r) => r.kind === "lacks") ?? [];
 
   const save = async () => {
     if (!rows) return;
@@ -63,9 +68,10 @@ function FactsEditor({ onDone, onSaved }: { onDone(): void; onSaved?(count: numb
             .filter(Boolean),
           source: r.source,
           createdAt: r.createdAt,
+          ...(r.kind === "lacks" ? { kind: "lacks" as const, topic: r.topic } : {}),
         }));
       await tailorApi.saveFacts(facts);
-      onSaved?.(facts.length);
+      onSaved?.(facts.filter((f) => f.kind !== "lacks").length);
       toast.success("Facts saved");
       onDone();
     } catch (e) {
@@ -90,12 +96,12 @@ function FactsEditor({ onDone, onSaved }: { onDone(): void; onSaved?(count: numb
         </div>
       ) : (
         <div className="-mx-1 max-h-[55vh] space-y-3 overflow-y-auto px-1">
-          {rows.length === 0 && <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">No facts yet.</p>}
-          {rows.map((r) => (
+          {has.length === 0 && <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">No facts yet.</p>}
+          {has.map((r) => (
             <div key={r.id} className="space-y-2 rounded-lg border p-3">
               <div className="flex items-start gap-2">
                 <Textarea className="min-h-14 text-sm" value={r.text} onChange={(e) => update(r.id, { text: e.target.value })} aria-label="Fact" />
-                <Button variant="ghost" size="icon-sm" aria-label="Delete fact" title="Delete" onClick={() => setRows((x) => x!.filter((y) => y.id !== r.id))}>
+                <Button variant="ghost" size="icon-sm" aria-label="Delete fact" title="Delete" onClick={() => remove(r.id)}>
                   <Trash2 />
                 </Button>
               </div>
@@ -113,6 +119,29 @@ function FactsEditor({ onDone, onSaved }: { onDone(): void; onSaved?(count: numb
               </div>
             </div>
           ))}
+          {lacks.length > 0 && (
+            <div className="rounded-lg border p-3">
+              <p className="text-xs font-medium">Not done</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                You answered &quot;Haven&apos;t done this&quot;. Tailoring won&apos;t ask about these again or imply them. Remove one if that changes.
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-1.5">
+                {lacks.map((r) => (
+                  <li key={r.id} className="flex items-center gap-1 rounded-md bg-muted py-0.5 pr-0.5 pl-2 text-xs" title={r.text}>
+                    {r.topic ?? r.text}
+                    <button
+                      type="button"
+                      className="rounded p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
+                      aria-label={`Remove ${r.topic ?? "topic"}`}
+                      onClick={() => remove(r.id)}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
       <DialogFooter className="sm:justify-between">

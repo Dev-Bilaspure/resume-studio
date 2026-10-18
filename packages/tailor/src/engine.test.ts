@@ -193,6 +193,47 @@ test("a pasted posting alone is enough: the engine reads its title, level and lo
   assert.equal(llm.calls.filter((c) => c === "posting_details").length, 1);
 });
 
+test("a 'haven't done this' is remembered: never evidence, shown to later runs as not done", async () => {
+  const saved: import("./types.ts").Fact[] = [];
+  const facts = { list: async () => saved, add: async (f: import("./types.ts").Fact[]) => void saved.push(...f) };
+  let matchPrompt = "";
+  const llm = scriptedLLM({
+    job_profile: () => profile,
+    requirement_matches: (req) => {
+      matchPrompt = String(req.prompt);
+      return {
+        matches: [{ requirementId: "r1", status: "missing", evidence: [], note: "n" }],
+        questions: saved.length ? [] : [{ requirementId: "r1", topic: "Kubernetes", question: "Have you run services on Kubernetes?" }],
+      };
+    },
+    resume_edits: (req) => {
+      const lacks = /FACT \[(f-[^\]]+)\]/.exec(String(req.prompt))?.[1];
+      // A model that tries to cite the declined topic anyway.
+      return { strategy: "s", edits: [{ ...edit("rewrite_bullet", "b2", "Cut failures **60%** using **Temporal**."), evidence: [{ kind: "bullet", id: "b2" }, ...(lacks ? [{ kind: "fact", id: lacks }] : [{ kind: "fact", id: saved[0]?.id ?? "x" }])] }] };
+    },
+    fact_check: (req) => ({ verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })) }),
+    repair: () => ({ strategy: "s", edits: [] }),
+  });
+  const engine = createTailorEngine({ llm, adapter, facts });
+  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  assert.equal((await engine.run(s0.id)).status, "needs_input");
+  await engine.answer(s0.id, [{ questionId: "q1", none: true }]);
+  const done = await engine.run(s0.id);
+  assert.equal(done.status, "ready", done.error?.message);
+  assert.equal(saved.length, 1);
+  assert.deepEqual([saved[0].kind, saved[0].topic], ["lacks", "Kubernetes"], "kept as a topic they lack");
+  assert.deepEqual(done.newFacts, [], "not a fact learned from the answers");
+  assert.equal(done.edits![0].status, "dropped", "an edit can't cite it");
+  assert.match(done.edits![0].issues!.join(), /said they haven't done/);
+
+  // The next run is told, and isn't asked again.
+  const s1 = await engine.start({ job: { company: "Beta", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const next = await engine.run(s1.id);
+  assert.match(matchPrompt, /NOT DONE: Kubernetes/);
+  assert.doesNotMatch(matchPrompt, /FACT \[/, "not shown as something they did");
+  assert.notEqual(next.status, "needs_input");
+});
+
 test("the review's choice of edits is saved with each preview", async () => {
   const llm = scriptedLLM({
     job_profile: () => profile,

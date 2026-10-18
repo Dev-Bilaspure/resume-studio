@@ -5,7 +5,7 @@ import { docText } from "./doc.ts";
 import { canonical, impliedBy, isSoftTerm, mentions, techTerms } from "./lexicon.ts";
 import type { EditOutput } from "./prompts.ts";
 import { markupProblems, plain, unsupportedNumbers } from "./text.ts";
-import type { Edit, EditOp, EvidenceRef, Fact, JobProfile, ResumeDoc, TailorOptions } from "./types.ts";
+import { evidenceFacts, type Edit, type EditOp, type EvidenceRef, type Fact, type JobProfile, type ResumeDoc, type TailorOptions } from "./types.ts";
 
 const MAX_BULLET_CHARS = 230;
 const MAX_HEADLINE_CHARS = 70;
@@ -17,11 +17,16 @@ export interface DocIndex {
   paragraphs: Map<string, string>;
   headline?: { id: string; text: string };
   facts: Map<string, Fact>;
+  /** Topics the candidate said they haven't done: never evidence. */
+  lacking: Set<string>;
   /** All the resume's text and facts: what "the candidate has" for skills lines. */
   allText: string;
+  /** Every entry's heading (role, employer, dates): the experience a headline must be true to. */
+  headings: string[];
 }
 
-export function indexDoc(doc: ResumeDoc, facts: Fact[]): DocIndex {
+export function indexDoc(doc: ResumeDoc, allFacts: Fact[]): DocIndex {
+  const facts = evidenceFacts(allFacts);
   const bullets = new Map<string, { text: string; listId: string }>();
   const lists = new Map<string, { bulletIds: string[]; heading: string }>();
   const skills = new Map<string, string>();
@@ -41,6 +46,8 @@ export function indexDoc(doc: ResumeDoc, facts: Fact[]): DocIndex {
     paragraphs,
     headline: doc.headline,
     facts: new Map(facts.map((f) => [f.id, f])),
+    lacking: new Set(allFacts.filter((f) => f.kind === "lacks").map((f) => f.id)),
+    headings: [...lists.values()].map((l) => l.heading).filter(Boolean),
     // From the structure as well as the adapter's plain text, so nothing on the resume is missed.
     allText: [docText(doc), doc.plainText, ...facts.map((f) => `${f.text} ${f.skills.join(", ")}`)].join("\n"),
   };
@@ -175,7 +182,9 @@ export function checkEdits(edits: Edit[], ix: DocIndex, profile: JobProfile, opt
     if ("text" in c) {
       issues.push(...markupProblems(c.text));
       const sources = [beforeText(ix, c), entryHeading(ix, c), ...e.evidence.map((r) => evidenceText(ix, r)).filter((x): x is string => x !== null)];
-      const unknownRefs = e.evidence.filter((r) => evidenceText(ix, r) === null);
+      const lacking = e.evidence.filter((r) => r.kind === "fact" && ix.lacking.has(r.id));
+      if (lacking.length) issues.push("cites a topic the candidate said they haven't done");
+      const unknownRefs = e.evidence.filter((r) => evidenceText(ix, r) === null && !(r.kind === "fact" && ix.lacking.has(r.id)));
       if (unknownRefs.length) issues.push(`cites evidence that doesn't exist: ${unknownRefs.map((r) => r.id).join(", ")}`);
       if (c.op === "add_bullet" && !e.evidence.length) issues.push("a new bullet must cite a fact or bullet");
 

@@ -57,6 +57,18 @@ export interface Fact {
   skills: string[];
   source: "answer" | "manual" | "import";
   createdAt: string;
+  /**
+   * "has" (the default): something the candidate did, usable as evidence. "lacks": a topic they said they
+   * haven't done ("Haven't done this"), kept so it isn't asked again and is never implied. Never evidence.
+   */
+  kind?: "has" | "lacks";
+  /** For "lacks": the topic, as the question named it ("Terraform"). */
+  topic?: string;
+}
+
+/** Facts usable as evidence (everything but the topics the candidate said they haven't done). */
+export function evidenceFacts(facts: Fact[]): Fact[] {
+  return facts.filter((f) => f.kind !== "lacks");
 }
 
 // ---- The job ------------------------------------------------------------------------------------------

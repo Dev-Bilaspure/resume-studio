@@ -4,7 +4,7 @@
 import { z } from "zod";
 import type { Answer, Edit, Fact, JobInput, JobProfile, Question, RequirementMatch, ResumeDoc, TailorOptions } from "./types.ts";
 
-export const PROMPTS_VERSION = "2026-10-17.3";
+export const PROMPTS_VERSION = "2026-10-19.1";
 
 // ---- Shared: how the resume and facts are shown to the model ----------------------------------------------
 
@@ -28,7 +28,13 @@ export function renderDoc(doc: ResumeDoc): string {
 
 export function renderFacts(facts: Fact[]): string {
   if (!facts.length) return "(none)";
-  return facts.map((f) => `FACT [${f.id}]: ${f.text}${f.skills.length ? ` (skills: ${f.skills.join(", ")})` : ""}`).join("\n");
+  const has = facts.filter((f) => f.kind !== "lacks");
+  const lacks = facts.filter((f) => f.kind === "lacks");
+  return [
+    ...has.map((f) => `FACT [${f.id}]: ${f.text}${f.skills.length ? ` (skills: ${f.skills.join(", ")})` : ""}`),
+    // Not evidence: what the candidate said they haven't done. Never cite, imply or ask about these again.
+    ...lacks.map((f) => `NOT DONE: ${f.topic ?? f.text} (the candidate said they haven't done this: never imply it, never cite it, don't ask about it)`),
+  ].join("\n");
 }
 
 function renderJob(job: JobInput): string {
@@ -148,14 +154,14 @@ export const MatchSchema = z.object({
         question: z.string().describe("A direct question the candidate can answer in a sentence or two, asking where and what they did."),
       }),
     )
-    .describe("Questions for the most important weak or missing requirements, at most 6. Empty if nothing is worth asking."),
+    .describe("Questions for the most important weak or missing requirements, at most 4, most important first. Empty if nothing is worth asking."),
 });
 
 export function matchPrompt(doc: ResumeDoc, facts: Fact[], profile: JobProfile, opts: TailorOptions) {
   return {
     system: `You are a hiring manager for software engineers, checking a resume against a job's requirements. Be strict and honest: a requirement is "strong" only if the resume or a fact shows real work with it, not just a keyword in a skills list.
 
-Then decide what to ask the candidate. Resumes leave out most of what people have done, so for important requirements that are weak or missing, ask a short, concrete question that would let them supply true evidence (where, what, scale, outcome). Prioritize must-haves. Don't ask about things the resume already shows, about deal-breakers like visas, or about requirements the candidate obviously can't have from their background${opts.askQuestions === false ? ". The candidate asked not to be asked anything: return no questions" : ""}.
+Then decide what to ask the candidate. Resumes leave out most of what people have done, so for important requirements that are weak or missing, ask a short, concrete question that would let them supply true evidence (where, what, scale, outcome). Ask only what would change the result: must-haves first, at most 4, and fewer is better. Don't ask about things the resume or a FACT already shows, about NOT DONE topics (the candidate already said no), about deal-breakers like visas, or about requirements the candidate obviously can't have from their background${opts.askQuestions === false ? ". The candidate asked not to be asked anything: return no questions" : ""}.
 ${DATA_NOTE}`,
     prompt: `<job_profile>\n${renderProfile(profile)}\n</job_profile>\n\n<resume>\n${renderDoc(doc)}\n</resume>\n\n<facts>\n${renderFacts(facts)}\n</facts>\n\nMatch every requirement to its evidence, then write the questions.`,
   };

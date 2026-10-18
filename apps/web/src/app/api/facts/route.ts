@@ -6,7 +6,17 @@ import { readFacts, writeFacts } from "@/server/tailor";
 export const GET = handler(async () => Response.json({ facts: await readFacts() }, { headers: noStore }));
 
 const Facts = z.object({
-  facts: z.array(z.object({ id: z.string(), text: z.string().trim().min(1).max(2000), skills: z.array(z.string()), source: z.enum(["answer", "manual", "import"]), createdAt: z.string() })),
+  facts: z.array(
+    z.object({
+      id: z.string(),
+      text: z.string().trim().min(1).max(2000),
+      skills: z.array(z.string()),
+      source: z.enum(["answer", "manual", "import"]),
+      createdAt: z.string(),
+      kind: z.enum(["has", "lacks"]).optional(),
+      topic: z.string().max(200).optional(),
+    }),
+  ),
 });
 
 export const PUT = handler(async (req: Request) => {

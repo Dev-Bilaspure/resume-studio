@@ -3,6 +3,7 @@
 import { Check, CircleAlert, Loader2, RotateCcw, Settings2, Square } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Answer } from "@resume-studio/tailor";
 import { toast } from "sonner";
 import { AiSettingsDialog } from "@/components/ai/ai-settings-dialog";
 import { Button } from "@/components/ui/button";
@@ -269,8 +270,9 @@ function Questions({ session, onDone }: { session: Session; onDone(): void }) {
         session.id,
         skip
           ? []
-          : questions.map((q) =>
-              answers[q.id].text.trim() && !answers[q.id].none ? { questionId: q.id, text: answers[q.id].text.trim() } : { questionId: q.id, none: true },
+          : // A blank answer is skipped, not "haven't done this": that one is remembered for good.
+            questions.flatMap((q): Answer[] =>
+              answers[q.id].none ? [{ questionId: q.id, none: true }] : answers[q.id].text.trim() ? [{ questionId: q.id, text: answers[q.id].text.trim() }] : [],
             ),
       );
       onDone();
@@ -289,7 +291,8 @@ function Questions({ session, onDone }: { session: Session; onDone(): void }) {
         <h2 className="text-lg font-semibold">A few requirements aren&apos;t clearly shown on your resume yet</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           If you&apos;ve done any of these, say where and what, briefly. Answers are only used as written, and are saved to your profile so you won&apos;t be
-          asked again. If you haven&apos;t, say so: nothing will be claimed.
+          asked again. If you haven&apos;t, tick &quot;I haven&apos;t done this&quot;: nothing will be claimed, and it won&apos;t be asked again. Leave one blank to
+          skip it for now.
         </p>
         <ol className="mt-6 space-y-4">
           {questions.map((q, i) => {
@@ -326,7 +329,7 @@ function Questions({ session, onDone }: { session: Session; onDone(): void }) {
         </ol>
         <div className="sticky bottom-0 mt-6 flex items-center gap-2 border-t bg-background/90 py-4 backdrop-blur">
           <span className="text-xs text-muted-foreground">
-            {answered} of {questions.length} answered. Unanswered ones count as &ldquo;haven&apos;t done this&rdquo;.
+            {answered} of {questions.length} answered. Blank ones are skipped for now.
           </span>
           <Button variant="ghost" className="ml-auto" disabled={busy} onClick={() => void send(true)}>
             Skip questions

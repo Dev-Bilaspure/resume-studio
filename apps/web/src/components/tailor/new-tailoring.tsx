@@ -89,7 +89,7 @@ export function NewTailoring({ resumeId }: { resumeId: string | null }) {
 
   useEffect(() => {
     tailorApi.facts().then(
-      (d) => setFactCount(d.facts.length),
+      (d) => setFactCount(d.facts.filter((f) => f.kind !== "lacks").length),
       () => {},
     );
   }, []);
