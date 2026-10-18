@@ -19,7 +19,7 @@ const doc: ResumeDoc = {
       lists: [
         {
           id: "l1",
-          heading: "Exemplary AI, Chennai | Software Development Engineer | Aug 2023 – Oct 2025",
+          heading: "Northwind Labs, Pune | Software Development Engineer | Aug 2023 – Oct 2025",
           bullets: [
             { id: "b1", text: "Designed a **DAG-driven** pipeline on **Temporal**, cutting pipeline failures by **60%**; ran workers on **Kubernetes (AKS)**." },
             { id: "b2", text: "Built backend REST services in **Node.js** and **TypeScript** on **AWS Lambda**." },
@@ -46,7 +46,7 @@ const profile: JobProfile = {
   dealBreakers: [],
 };
 
-const facts: Fact[] = [{ id: "f1", text: "Wrote Terraform modules for the AKS clusters at Exemplary AI.", skills: ["Terraform"], source: "answer", createdAt: "" }];
+const facts: Fact[] = [{ id: "f1", text: "Wrote Terraform modules for the AKS clusters at Northwind Labs.", skills: ["Terraform"], source: "answer", createdAt: "" }];
 
 const edit = (id: string, change: Edit["change"], evidence: Edit["evidence"] = []): Edit => ({ id, change, reason: "", requirements: [], evidence });
 
@@ -172,7 +172,7 @@ test("a headline names the job's specialty or none", async () => {
 });
 
 test("a headline is positioning: a role name is fine, a level must be shown by a role", () => {
-  const roles = ["Exemplary AI, Chennai Aug 2023 – Oct 2025 Software Development Engineer", "Indihood 2021 – 2023 Software Engineer"];
+  const roles = ["Northwind Labs, Pune Aug 2023 – Oct 2025 Software Development Engineer", "Acme Lending 2021 – 2023 Software Engineer"];
   for (const ok of ["Backend Engineer", "Software Development Engineer", "Full-Stack Engineer", "Platform Engineer"]) assert.equal(headlineLevelClaim(ok, roles), null, ok);
   assert.equal(headlineLevelClaim("Senior Backend Engineer", roles), "Senior");
   assert.equal(headlineLevelClaim("Staff Engineer", roles), "Staff");
