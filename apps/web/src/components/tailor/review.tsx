@@ -26,6 +26,18 @@ const OP_LABEL: Record<Edit["change"]["op"], string> = {
   rewrite_skills: "Updated skills",
 };
 
+/** Why a suggestion was left out, in the reader's terms (see DropReason in the engine). */
+const DROP_WHY: Record<NonNullable<Edit["dropReason"]>, string> = {
+  checks: "It says more than your resume or answers show.",
+  "fact-check": "The fact-check found a claim your resume or answers don't support.",
+  apply: "It couldn't be applied to the LaTeX.",
+  build: "It broke the build.",
+  "page-fit": "It was cut to keep the resume within its page budget.",
+};
+
+/** Notes that are only about length: the change is fine, it may just cost a line. */
+const lengthOnly = (e: Edit) => !!e.issues?.length && e.issues.every((i) => /may add a line/.test(i));
+
 type Tab = "changes" | "requirements" | "keywords";
 
 export function Review({ session }: { session: SessionView }) {
@@ -33,8 +45,16 @@ export function Review({ session }: { session: SessionView }) {
   const edits = useMemo(() => session.edits ?? [], [session.edits]);
   const usable = useMemo(() => edits.filter((e) => e.status !== "dropped"), [edits]);
   const dropped = edits.filter((e) => e.status === "dropped");
-  const [accepted, setAccepted] = useState<Set<string>>(() => new Set(usable.map((e) => e.id)));
+  // Your last choice if you've been here before (it's saved with every preview), else every change.
+  const [accepted, setAccepted] = useState<Set<string>>(() => new Set(session.selection ?? usable.map((e) => e.id)));
   const [tab, setTab] = useState<Tab>("changes");
+  const [droppedOpen, setDroppedOpen] = useState(false);
+  const droppedRef = useRef<HTMLElement>(null);
+  const showDropped = () => {
+    setTab("changes");
+    setDroppedOpen(true);
+    requestAnimationFrame(() => droppedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
   const [view, setView] = useState<"tailored" | "original">("tailored");
   // Narrow windows show one pane at a time.
   const [pane, setPane] = useState<"changes" | "pdf">("changes");
@@ -125,10 +145,20 @@ export function Review({ session }: { session: SessionView }) {
               <section className="rounded-xl border bg-card p-4">
                 <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">The approach</p>
                 <p className="mt-1.5 text-sm leading-relaxed">{session.strategy}</p>
+                {/* The approach was written before the checks: it may describe a suggestion that was then left out. */}
+                {dropped.length > 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Written before the checks, so it may mention {dropped.length === 1 ? "the suggestion" : "suggestions"} that{" "}
+                    <button type="button" className="text-primary hover:underline" onClick={showDropped}>
+                      {dropped.length === 1 ? "was left out" : "were left out"}
+                    </button>
+                    .
+                  </p>
+                )}
               </section>
             )}
 
-            <Warnings session={session} />
+            <Warnings session={session} dropped={dropped} onShowDropped={showDropped} />
 
             {session.newFacts.length > 0 && (
               <p className="flex items-start gap-2 rounded-lg border px-3 py-2 text-xs text-muted-foreground">
@@ -175,13 +205,13 @@ export function Review({ session }: { session: SessionView }) {
               )}
             </div>
 
-            {tab === "changes" &&
-              (usable.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No changes passed the checks. Your resume already fits this job as well as it truthfully can.
-                </p>
-              ) : (
-                <div className="space-y-6">
+            {tab === "changes" && (
+              <div className="space-y-6">
+                {usable.length === 0 && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">
+                    No changes passed the checks. Your resume already fits this job as well as it truthfully can.
+                  </p>
+                )}
                   {groups.map(([section, list]) => (
                     <section key={section}>
                       <h3 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">{section}</h3>
@@ -200,9 +230,18 @@ export function Review({ session }: { session: SessionView }) {
                       </ul>
                     </section>
                   ))}
-                  {dropped.length > 0 && <Dropped edits={dropped} session={session} />}
-                </div>
-              ))}
+                {(dropped.length > 0 || (session.skippedSuggestions?.length ?? 0) > 0) && (
+                  <Dropped
+                    ref={droppedRef}
+                    edits={dropped}
+                    skipped={session.skippedSuggestions ?? []}
+                    session={session}
+                    open={droppedOpen}
+                    onOpenChange={setDroppedOpen}
+                  />
+                )}
+              </div>
+            )}
 
             {tab === "requirements" && <Requirements session={session} accepted={accepted} />}
             {tab === "keywords" && <Keywords session={session} />}
@@ -314,13 +353,14 @@ function Scoreboard({ session, preview }: { session: SessionView; preview: Previ
   );
 }
 
-function Warnings({ session }: { session: SessionView }) {
+function Warnings({ session, dropped, onShowDropped }: { session: SessionView; dropped: Edit[]; onShowDropped(): void }) {
   // The engine lists a hard requirement as a "Check: …" warning only when the resume doesn't already meet
-  // it (a degree you have isn't a concern): show those, once, as hard requirements.
+  // it (a degree you have isn't a concern): show those, once, as hard requirements. Its summary of
+  // left-out suggestions is replaced by one that names them.
   const all = session.report?.warnings ?? [];
   const deal = (session.profile?.dealBreakers ?? []).filter((d) => all.includes(`Check: ${d.text}`));
-  const warnings = all.filter((w) => !w.startsWith("Check: "));
-  if (!deal.length && !warnings.length) return null;
+  const warnings = all.filter((w) => !w.startsWith("Check: ") && !/^\d+ (suggestions? (was|were) left out|proposed edits? (was|were) dropped)/.test(w));
+  if (!deal.length && !warnings.length && !dropped.length) return null;
   return (
     <section className="space-y-2">
       {deal.length > 0 && (
@@ -333,6 +373,26 @@ function Warnings({ session }: { session: SessionView }) {
                 <li key={i}>{d.text}</li>
               ))}
             </ul>
+          </div>
+        </div>
+      )}
+      {dropped.length > 0 && (
+        <div className="flex items-start gap-2 rounded-lg border px-3 py-2.5 text-xs text-muted-foreground">
+          <Info className="mt-0.5 size-3.5 shrink-0" />
+          <div className="min-w-0">
+            <p>
+              {dropped.length} suggestion{dropped.length === 1 ? " was" : "s were"} left out to keep the resume true and within its budget:{" "}
+              {dropped.map((e, i) => (
+                <span key={e.id}>
+                  {i > 0 && "; "}
+                  <span className="text-foreground">{droppedTitle(e, session)}</span>
+                </span>
+              ))}
+              .{" "}
+              <button type="button" className="text-primary hover:underline" onClick={onShowDropped}>
+                See why
+              </button>
+            </p>
           </div>
         </div>
       )}
@@ -379,7 +439,7 @@ function EditCard({
             {ctx.where && <span className="truncate text-xs text-muted-foreground">{ctx.where}</span>}
             {edit.status === "flagged" && (
               <span className="rounded bg-warning/15 px-1 text-[10.5px] text-warning" title={edit.issues?.join("\n")}>
-                check this
+                {lengthOnly(edit) ? "may add a line" : "check this"}
               </span>
             )}
           </div>
@@ -395,6 +455,7 @@ function EditCard({
             </div>
           )}
           {edit.status === "flagged" && edit.issues?.length ? <p className="mt-2 text-xs text-warning">{edit.issues.join(" ")}</p> : null}
+          {edit.revisedFrom && <Revised from={edit.revisedFrom} />}
           {edit.evidence.length > 0 && (
             <button
               type="button"
@@ -476,32 +537,122 @@ function Evidence({ refs, session, facts }: { refs: EvidenceRef[]; session: Sess
   );
 }
 
-function Dropped({ edits, session }: { edits: Edit[]; session: SessionView }) {
-  const [open, setOpen] = useState(false);
+/** A left-out suggestion in a few words: "changing the headline to “Backend Engineer”". */
+function droppedTitle(e: Edit, session: SessionView): string {
+  const c = e.change;
+  const where = editContext(session.doc, c).where;
+  const at = where ? ` (${where})` : "";
+  switch (c.op) {
+    case "set_headline":
+      return `changing the headline to “${plainText(c.text)}”`;
+    case "add_bullet":
+      return `a new bullet${at}`;
+    case "rewrite_bullet":
+      return `a rewritten bullet${at}`;
+    case "remove_bullet":
+      return `removing a bullet${at}`;
+    case "reorder_bullets":
+      return `reordering bullets${at}`;
+    case "rewrite_paragraph":
+      return "a rewritten summary";
+    case "rewrite_skills":
+      return `updated skills${at}`;
+  }
+}
+
+/** Suggestions the checks left out, and why: every one, also when no change passed. */
+function Dropped({
+  ref,
+  edits,
+  skipped,
+  session,
+  open,
+  onOpenChange,
+}: {
+  ref: React.Ref<HTMLElement>;
+  edits: Edit[];
+  skipped: string[];
+  session: SessionView;
+  open: boolean;
+  onOpenChange(open: boolean): void;
+}) {
+  const total = edits.length + skipped.length;
   return (
-    <section className="rounded-xl border border-dashed">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 px-4 py-3 text-left text-xs text-muted-foreground">
+    <section ref={ref} className="scroll-mt-4 rounded-xl border border-dashed">
+      <button type="button" onClick={() => onOpenChange(!open)} className="flex w-full items-center gap-2 px-4 py-3 text-left text-xs text-muted-foreground">
         <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
-        {edits.length} suggestion{edits.length === 1 ? "" : "s"} left out because {edits.length === 1 ? "it" : "they"} didn&apos;t pass the fact-check or the
-        build
+        Left out: {total} suggestion{total === 1 ? "" : "s"}, and why
       </button>
       {open && (
-        <ul className="space-y-3 px-4 pb-4">
+        <ul className="space-y-4 px-4 pb-4">
           {edits.map((e) => {
-            const ctx = editContext(session.doc, e.change);
+            const c = e.change;
+            const ctx = editContext(session.doc, c);
+            const before = ctx.before ? plainText(ctx.before) : null;
+            const after = "text" in c ? plainText(c.text) : null;
+            const details = (e.issues ?? []).filter((i) => !/^(broke the build|cut to fit the page budget)$/.test(i));
             return (
               <li key={e.id} className="text-xs">
                 <p className="font-medium">
-                  {OP_LABEL[e.change.op]} <span className="font-normal text-muted-foreground">{ctx.where}</span>
+                  {OP_LABEL[c.op]}
+                  {ctx.where && c.op !== "set_headline" && <span className="font-normal text-muted-foreground"> · {ctx.where}</span>}
                 </p>
-                {"text" in e.change && <p className="mt-0.5 text-muted-foreground">{plainText(e.change.text)}</p>}
-                <p className="mt-0.5 text-destructive">{e.issues?.join(" ")}</p>
+                <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-muted-foreground">
+                  {before !== null && c.op !== "add_bullet" && (
+                    <>
+                      <dt>Now</dt>
+                      <dd className="text-foreground">{before || "(empty)"}</dd>
+                    </>
+                  )}
+                  {after !== null && c.op !== "remove_bullet" && (
+                    <>
+                      <dt>Suggested</dt>
+                      <dd className="text-foreground">{after}</dd>
+                    </>
+                  )}
+                  <dt>Why not</dt>
+                  <dd>
+                    {DROP_WHY[e.dropReason ?? "checks"]}
+                    {details.length > 0 && <span className="block text-[11px]">{details.join(" ")}</span>}
+                  </dd>
+                </dl>
               </li>
             );
           })}
+          {skipped.length > 0 && (
+            <li className="text-xs">
+              <p className="font-medium">
+                {skipped.length} more suggestion{skipped.length === 1 ? "" : "s"} couldn&apos;t be read as a change at all
+              </p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-muted-foreground">
+                {skipped.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            </li>
+          )}
         </ul>
       )}
     </section>
+  );
+}
+
+/** A change the fact-check sent back once: what the first version said, and what was wrong with it. */
+function Revised({ from }: { from: NonNullable<Edit["revisedFrom"]> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2 text-[11px] text-muted-foreground">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-1 hover:text-foreground">
+        <ChevronDown className={cn("size-3 transition-transform", open && "rotate-180")} />
+        Revised after the fact-check
+      </button>
+      {open && (
+        <div className="mt-1 space-y-0.5 border-l pl-3">
+          {from.text && <p className="line-through decoration-muted-foreground/50">{plainText(from.text)}</p>}
+          <p>{from.issues.join(" ")}</p>
+        </div>
+      )}
+    </div>
   );
 }
 
