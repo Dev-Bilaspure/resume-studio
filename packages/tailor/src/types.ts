@@ -180,7 +180,18 @@ export interface Edit {
   /** Set by verification. */
   status?: "ok" | "flagged" | "dropped";
   issues?: string[];
+  /** Why a dropped edit was left out. */
+  dropReason?: DropReason;
+  /** The first version of an edit the repair round fixed, and what was wrong with it. */
+  revisedFrom?: { text: string; issues: string[] };
 }
+
+/**
+ * checks: failed the deterministic checks (a number, technology or level the evidence doesn't have, an
+ * unknown target); fact-check: the fact-checking model found a claim the evidence doesn't support;
+ * apply: couldn't be applied to the document; build: broke the build; page-fit: cut to fit the page budget.
+ */
+export type DropReason = "checks" | "fact-check" | "apply" | "build" | "page-fit";
 
 // ---- Verification & report ------------------------------------------------------------------------------
 
@@ -252,6 +263,10 @@ export interface Session {
   /** Facts learned from your answers in this session (to save to your fact bank). */
   newFacts: Fact[];
   edits?: Edit[];
+  /** Edits the model wrote that couldn't be read as edits at all (before any check), with why. */
+  skippedSuggestions?: string[];
+  /** The edits chosen in review (saved with every preview), so the choice survives a reload. */
+  selection?: string[];
   strategy?: string;
   report?: Report;
   /** The tailored document with every ok edit applied (review may accept a subset). */

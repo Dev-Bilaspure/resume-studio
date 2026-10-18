@@ -105,8 +105,11 @@ test("every proposed edit is accounted for: kept, repaired or shown as dropped",
   assert.deepEqual(s.fit && [s.fit.level, s.fit.must.total, s.fit.gaps], ["long-shot", 1, ["Kubernetes"]], "the fit is assessed from the matching");
   const byTarget = Object.fromEntries((s.edits ?? []).map((e) => [`${e.change.op}:${e.change.target}:${e.status}`, e]));
   assert.deepEqual(Object.keys(byTarget).sort(), ["remove_bullet:b3:ok", "rewrite_bullet:b1:dropped", "rewrite_bullet:b2:ok", "set_headline:h1:ok"].sort());
-  assert.match(byTarget["rewrite_bullet:b2:ok"].issues!.join(), /Revised after the fact-check: “Led a platform team”/);
+  assert.match(byTarget["rewrite_bullet:b2:ok"].revisedFrom!.issues.join(), /“Led a platform team”/, "a repaired edit keeps what was wrong with its first version");
+  assert.match(byTarget["rewrite_bullet:b2:ok"].revisedFrom!.text, /^Led a platform team/);
   assert.match(byTarget["rewrite_bullet:b1:dropped"].issues!.join(), /10M/);
+  assert.equal(byTarget["rewrite_bullet:b1:dropped"].dropReason, "checks", "a dropped edit says why");
+  assert.match(s.report!.warnings.join(), /1 suggestion was left out: not supported by the evidence/);
   assert.equal((byTarget["rewrite_bullet:b2:ok"].change as { text: string }).text, "Cut failures **60%** with **Temporal** workflows.");
   assert.equal(byTarget["rewrite_bullet:b2:ok"].reason, "Names the workflow engine.", "a repaired edit explains itself, not the version it replaced");
   // Ids are unique, and only kept edits reach the document.
@@ -188,4 +191,19 @@ test("a pasted posting alone is enough: the engine reads its title, level and lo
   // Retried or resumed, it isn't read twice.
   await engine.retry(s.id);
   assert.equal(llm.calls.filter((c) => c === "posting_details").length, 1);
+});
+
+test("the review's choice of edits is saved with each preview", async () => {
+  const llm = scriptedLLM({
+    job_profile: () => profile,
+    requirement_matches: () => ({ matches: [{ requirementId: "r1", status: "missing", evidence: [], note: "n" }], questions: [] }),
+    resume_edits: () => ({ strategy: "s", edits: [edit("rewrite_bullet", "b2", "Cut failures **60%** using **Temporal**."), edit("remove_bullet", "b3", "")] }),
+    fact_check: (req) => ({ verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })) }),
+  });
+  const engine = createTailorEngine({ llm, adapter });
+  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s = await engine.run(s0.id);
+  assert.equal(s.selection, undefined, "nothing chosen yet");
+  await engine.preview(s0.id, ["e2", "nope"]);
+  assert.deepEqual((await engine.getSession(s0.id)).selection, ["e2"], "only real, kept edits");
 });

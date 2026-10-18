@@ -91,6 +91,7 @@ export function mergeFitEdits(edits: Edit[], fit: Edit[], original: ResumeDoc): 
     if (added) {
       if (c.op === "remove_bullet") {
         added.status = "dropped";
+        added.dropReason = "page-fit";
         added.issues = [...(added.issues ?? []), "cut to fit the page budget"];
       } else if (added.change.op === "add_bullet") {
         added.change = { ...added.change, text: c.text };

@@ -22,7 +22,7 @@ import {
 } from "./prompts.ts";
 import { assessFit } from "./fit.ts";
 import { coverage, uid } from "./text.ts";
-import type { Answer, BuildCheck, Edit, Fact, JobInput, JobProfile, Report, Session, SessionStatus, SourceFiles, TailorEvent, TailorOptions } from "./types.ts";
+import type { Answer, BuildCheck, DropReason, Edit, Fact, JobInput, JobProfile, Question, Report, Session, SessionStatus, SourceFiles, TailorEvent, TailorOptions } from "./types.ts";
 import { beforeText, checkEdits, entryHeading, evidenceText, indexDoc, toEdit } from "./verify.ts";
 
 export const ENGINE_VERSION = "0.1.0";
@@ -186,6 +186,7 @@ export function createTailorEngine(deps: EngineDeps) {
     );
     s.strategy = out.strategy;
     const { edits, rejected } = convert(out.edits, 1);
+    s.skippedSuggestions = rejected;
     for (const r of rejected) event(s, { type: "warning", message: `Skipped an edit: ${r}` });
     return edits;
   }
@@ -197,11 +198,12 @@ export function createTailorEngine(deps: EngineDeps) {
     // Structural problems (a duplicate or unknown target) can't be fixed by rewording: drop them.
     // Content problems (numbers, technologies, markup, the fact-check) get one repair round.
     const structural = (issues: string[]) => issues.every((i) => /another edit already changes|unknown (bullet|entry|paragraph|skills line|headline)|isn't in entry|every bullet of the entry|isn't allowed/.test(i));
-    const dropped: Edit[] = first.failed.filter((f) => structural(f.issues)).map((f) => ({ ...f.edit, status: "dropped", issues: f.issues }));
-    let failed = first.failed.filter((f) => !structural(f.issues));
+    type Failed = { edit: Edit; issues: string[]; by: "checks" | "fact-check" };
+    const dropped: Edit[] = first.failed.filter((f) => structural(f.issues)).map((f) => ({ ...f.edit, status: "dropped", issues: f.issues, dropReason: "checks" }));
+    let failed: Failed[] = first.failed.filter((f) => !structural(f.issues)).map((f) => ({ ...f, by: "checks" }));
     const judged = await judge(s, first.passed, ix, signal);
-    let passed = judged.passed;
-    failed = [...failed, ...judged.failed];
+    const passed = judged.passed;
+    failed = [...failed, ...judged.failed.map((f) => ({ ...f, by: "fact-check" as const }))];
 
     if (failed.length) {
       event(s, { type: "step", step: "repair", message: `Fixing ${failed.length} edit${failed.length === 1 ? "" : "s"} that overstated the evidence` });
@@ -216,10 +218,11 @@ export function createTailorEngine(deps: EngineDeps) {
         const original = byTarget.get(e.change.target)!;
         byTarget.delete(e.change.target);
         // The fix replaces the original, with its own reason (the original's may describe what was cut,
-        // like a skill the evidence didn't support); the note says what was wrong with the first version.
-        passed.push({ ...e, reason: e.reason || original.edit.reason, issues: [`Revised after the fact-check: ${original.issues.join("; ")}`, ...(e.issues ?? [])] });
+        // like a skill the evidence didn't support); revisedFrom keeps the first version and its problems.
+        const firstText = "text" in original.edit.change ? original.edit.change.text : "";
+        passed.push({ ...e, reason: e.reason || original.edit.reason, revisedFrom: { text: firstText, issues: original.issues } });
       }
-      for (const f of byTarget.values()) dropped.push({ ...f.edit, status: "dropped", issues: f.issues });
+      for (const f of byTarget.values()) dropped.push({ ...f.edit, status: "dropped", issues: f.issues, dropReason: f.by });
     }
     return order([...passed, ...dropped]);
   }
@@ -256,6 +259,7 @@ export function createTailorEngine(deps: EngineDeps) {
         const bad = edits.find((x) => x.id === e.editId);
         if (!bad) throw e;
         bad.status = "dropped";
+        bad.dropReason = "apply";
         bad.issues = [...(bad.issues ?? []), `couldn't be applied: ${e.message}`];
         usable = usable.filter((x) => x.id !== e.editId);
       }
@@ -281,6 +285,7 @@ export function createTailorEngine(deps: EngineDeps) {
       const bad = culprit ? edits.find((e) => e.id === culprit) : undefined;
       if (!bad) break;
       bad.status = "dropped";
+      bad.dropReason = "build";
       bad.issues = [...(bad.issues ?? []), "broke the build"];
       draft = await applyAll(s, edits);
       check = await build(s, draft, maxPages, signal);
@@ -325,8 +330,8 @@ export function createTailorEngine(deps: EngineDeps) {
     const met = (kind: string) =>
       afterMatches.some((m) => m.status === "strong" && profile.requirements.find((r) => r.id === m.requirementId)?.category === (kind === "years" ? "experience" : "education"));
     for (const d of profile.dealBreakers) if (!((d.kind === "years" || d.kind === "degree") && met(d.kind))) warnings.push(`Check: ${d.text}`);
-    const dropped = edits.filter((e) => e.status === "dropped").length;
-    if (dropped) warnings.push(`${dropped} proposed edit${dropped === 1 ? " was" : "s were"} dropped because the evidence didn't support ${dropped === 1 ? "it" : "them"}.`);
+    const dropped = edits.filter((e) => e.status === "dropped");
+    if (dropped.length) warnings.push(droppedSummary(dropped));
     return {
       before: { ...coverage(before?.text ?? docText(s.doc!), profile.keywords, s.matches!), build: before },
       after: { ...coverage(after?.text ?? virtual.plainText, profile.keywords, afterMatches), build: after },
@@ -456,11 +461,17 @@ export function createTailorEngine(deps: EngineDeps) {
       return { source, facts: s.newFacts };
     },
 
-    /** Previews a subset of edits (for the review screen's live PDF). */
+    /** Previews a subset of edits (for the review screen's live PDF), and remembers that choice. */
     async preview(id: string, acceptedEditIds: string[]): Promise<SourceFiles> {
       const s = await load(id);
       if (!s.edits || !s.doc) throw new SessionError(409, "No draft yet");
-      return deps.adapter.apply(s.source, s.doc, s.edits.filter((e) => acceptedEditIds.includes(e.id) && e.status !== "dropped"));
+      const usable = new Set(s.edits.filter((e) => e.status !== "dropped").map((e) => e.id));
+      const selection = acceptedEditIds.filter((x) => usable.has(x));
+      if (s.status === "ready" && JSON.stringify(selection) !== JSON.stringify(s.selection)) {
+        s.selection = selection;
+        await store.put(s);
+      }
+      return deps.adapter.apply(s.source, s.doc, s.edits.filter((e) => selection.includes(e.id)));
     },
   };
 }
@@ -468,6 +479,23 @@ export function createTailorEngine(deps: EngineDeps) {
 export type TailorEngine = ReturnType<typeof createTailorEngine>;
 
 // ---- helpers ------------------------------------------------------------------------------------------------
+
+const DROP_WHY: Record<DropReason, string> = {
+  checks: "not supported by the evidence",
+  "fact-check": "flagged by the fact-check",
+  apply: "couldn't be applied",
+  build: "broke the build",
+  "page-fit": "cut to fit the page",
+};
+
+/** "3 suggestions were left out: 2 not supported by the evidence; 1 broke the build." */
+export function droppedSummary(dropped: Edit[]): string {
+  const counts = new Map<DropReason, number>();
+  for (const e of dropped) counts.set(e.dropReason ?? "checks", (counts.get(e.dropReason ?? "checks") ?? 0) + 1);
+  const n = dropped.length;
+  const parts = [...counts].map(([r, c]) => (counts.size === 1 ? DROP_WHY[r] : `${c} ${DROP_WHY[r]}`));
+  return `${n} suggestion${n === 1 ? " was" : "s were"} left out: ${parts.join("; ")}.`;
+}
 
 function convert(outs: EditOutput[], startAt: number): { edits: Edit[]; rejected: string[] } {
   const edits: Edit[] = [];
