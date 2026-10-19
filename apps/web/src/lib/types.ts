@@ -243,6 +243,18 @@ export interface SyncStatus {
   /** In the repository, not downloaded (as of the last check). */
   remote: SyncItem[];
   conflicts: SyncConflict[];
+  /** Snapshot history and labels (absent while not connected). */
+  history?: SyncHistory;
+}
+
+/** Snapshots and labels ("<resume>/<label>") on one side and not the other. */
+export interface SyncHistory {
+  localSnapshots: number;
+  remoteSnapshots: number;
+  localLabels: string[];
+  remoteLabels: string[];
+  /** Labels changed in both places: this computer's version is kept. */
+  labelConflicts: string[];
 }
 
 export interface SyncDiff {

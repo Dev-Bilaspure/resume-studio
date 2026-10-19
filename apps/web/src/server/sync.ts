@@ -9,6 +9,17 @@ import { ROOT, STATE_DIR } from "./config";
 import { emit } from "./events";
 import { HttpError, atomicWrite } from "./fsutil";
 import { run } from "./run";
+import {
+  REMOTE_BRANCH,
+  REMOTE_HISTORY_REFSPECS,
+  downloadHistory,
+  historyIncoming,
+  historyOutgoing,
+  historyPushRefspecs,
+  historyStatus,
+  importLocalHistory,
+  recordUploadedHistory,
+} from "./sync-history";
 import { SYNCED_PLACES, findSecret, isSynced } from "./sync-rules";
 
 // Backup and sync of your data to a private git repository you own (e.g. on GitHub), by hand: Upload sends
@@ -311,7 +322,9 @@ export async function syncStatus(check = false): Promise<SyncStatus> {
       }
       await writeConfig(config);
     }
+    await importLocalHistory(syncGit);
     const p = await plan();
+    const history = await historyStatus(syncGit);
     const describe = describer([p.head, p.remote]);
     const conflicts: SyncConflict[] = [];
     for (const [path, c] of p.conflicts) conflicts.push({ path, localChange: c.local, remoteChange: c.remote, ...(await describe(path)) });
@@ -325,25 +338,28 @@ export async function syncStatus(check = false): Promise<SyncStatus> {
       lastDownload: config.lastDownload,
       lastCheck: config.lastCheck,
       everSynced: !!p.head,
-      remoteEmpty: config.lastCheck && !config.lastCheck.error ? !p.remote : undefined,
+      remoteEmpty: config.lastCheck && !config.lastCheck.error ? !p.remote && !(await remoteHistoryExists()) : undefined,
       remoteProblem: p.foreign.length
         ? `The repository contains files that aren't Resume Studio data (${p.foreign.slice(0, 3).join(", ")}${p.foreign.length > 3 ? "…" : ""}). Nothing will be downloaded until they're removed from it.`
         : undefined,
       local: await items(p.local, describe),
       remote: await items(p.incoming, describe),
       conflicts,
+      history,
     };
   });
 }
 
+/** The repository's data ("main"), snapshot history ("snapshots") and labels, as they are now. */
 async function fetchRemote() {
-  await gitOk(["fetch", "-q", "--prune", "--no-tags", "origin", `+refs/heads/${BRANCH}:${REMOTE_REF}`], { network: true }).catch(async (e) => {
-    // An empty repository has no branch to fetch yet: that's fine, there's simply nothing there.
-    const heads = await gitOk(["ls-remote", "--heads", "origin"], { network: true });
-    if (heads.trim()) throw e;
-    await git(["update-ref", "-d", REMOTE_REF]);
-  });
+  // Patterns, not names: an empty repository (or one without history yet) fetches nothing, no error.
+  await gitOk(["fetch", "-q", "--prune", "--no-tags", "origin", "+refs/heads/*:refs/remotes/origin/*", ...REMOTE_HISTORY_REFSPECS], { network: true });
 }
+
+/** The sync repository's git, for the history module. */
+const syncGit = (args: string[]) => git(args);
+
+const remoteHistoryExists = async () => (await git(["rev-parse", "--verify", "-q", REMOTE_BRANCH])).code === 0;
 
 // ---- Connecting ----------------------------------------------------------------------------------------------
 
@@ -436,29 +452,38 @@ export async function uploadSync(): Promise<SyncStatus> {
   await exclusive(async () => {
     await ensureRepo(config.url);
     await fetchRemote();
+    await importLocalHistory(syncGit);
     const p = await plan();
-    if (p.remote && p.remote !== p.head) {
+    const history = await historyStatus(syncGit);
+    if ((p.remote && p.remote !== p.head) || historyIncoming(history)) {
       throw new HttpError(409, "The repository has changes this computer doesn't have yet. Download them first, then upload.");
     }
-    if (!p.local.size) throw new HttpError(409, "Nothing to upload: everything here is already in the repository.");
+    if (!p.local.size && !historyOutgoing(history)) throw new HttpError(409, "Nothing to upload: everything here is already in the repository.");
     const paths = [...p.local.keys()];
     await checkUploadable(paths.filter((x) => p.local.get(x) !== "deleted"));
 
-    // Stage exactly these paths (forced: the project's .gitignore ignores the data folders), commit, push.
-    await gitOk(["add", "-A", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"], { input: paths.join("\0") + "\0" });
-    const identity = await commitIdentity();
-    await gitOk([...identity, "commit", "-q", "--no-verify", "-m", uploadMessage(p.local)]);
-    const commit = (await headCommit())!;
+    // Stage exactly these paths (forced: the project's .gitignore ignores the data folders) and commit.
+    if (paths.length) {
+      await gitOk(["add", "-A", "-f", "--pathspec-from-file=-", "--pathspec-file-nul"], { input: paths.join("\0") + "\0" });
+      const identity = await commitIdentity();
+      await gitOk([...identity, "commit", "-q", "--no-verify", "-m", uploadMessage(p.local)]);
+    }
+    const commit = await headCommit();
+    // Data, snapshot history and labels in one push: all of it lands, or none of it does. --prune removes
+    // labels deleted here (the repository has nothing this computer doesn't, checked above).
     try {
-      await gitOk(["push", "-q", "origin", `HEAD:refs/heads/${BRANCH}`], { network: true });
+      await gitOk(["push", "-q", "--atomic", "--prune", "origin", ...(commit ? [`HEAD:refs/heads/${BRANCH}`] : []), ...(await historyPushRefspecs(syncGit))], { network: true });
     } catch (e) {
       // Not uploaded: undo the commit, keeping every change here as it was, so nothing is lost or half-done.
-      await gitOk(p.head ? ["reset", "-q", "--soft", p.head] : ["update-ref", "-d", `refs/heads/${BRANCH}`]);
-      await gitOk(["reset", "-q"]);
+      if (paths.length) {
+        await gitOk(p.head ? ["reset", "-q", "--soft", p.head] : ["update-ref", "-d", `refs/heads/${BRANCH}`]);
+        await gitOk(["reset", "-q"]);
+      }
       throw e;
     }
-    await gitOk(["update-ref", REMOTE_REF, commit]);
-    config.lastUpload = { at: new Date().toISOString(), commit };
+    if (commit) await gitOk(["update-ref", REMOTE_REF, commit]);
+    await recordUploadedHistory(syncGit);
+    config.lastUpload = { at: new Date().toISOString(), commit: commit ?? "" };
     config.lastCheck = { at: config.lastUpload.at };
     await writeConfig(config);
   });
@@ -490,34 +515,49 @@ export async function downloadSync(resolutions: Resolutions = {}): Promise<SyncS
   await exclusive(async () => {
     await ensureRepo(config.url);
     await fetchRemote();
+    await importLocalHistory(syncGit);
     const p = await plan();
-    if (!p.remote || p.remote === p.head) throw new HttpError(409, "Nothing to download: this computer already has everything in the repository.");
-    const unresolved = [...p.conflicts.keys()].filter((x) => resolutions[x] !== "local" && resolutions[x] !== "remote");
-    if (unresolved.length) throw new HttpError(409, `Choose which version to keep for ${unresolved.length} file${unresolved.length === 1 ? "" : "s"} changed in both places.`);
-
-    // Only data paths may come from the repository: anything else would land in the app's own folder.
-    const remoteFiles = (await gitOk(["ls-tree", "-r", "-z", "--name-only", p.remote])).split("\0").filter(Boolean);
-    const foreign = remoteFiles.filter((f) => !isSynced(f));
-    if (foreign.length) throw new HttpError(400, `The repository contains files that aren't Resume Studio data (${foreign.slice(0, 3).join(", ")}). Download refused, so nothing outside your data is touched.`);
-
-    // Kept and put back after the repository's version is checked out: your changes not uploaded yet, and
-    // the conflicts where you chose this computer's version. Replaced: conflicts where you chose the
-    // repository's (a copy goes to backups).
-    const keep = [...p.local.keys(), ...[...p.conflicts.keys()].filter((x) => resolutions[x] === "local")];
-    const replaced = [...p.conflicts.keys()].filter((x) => resolutions[x] === "remote");
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    if (replaced.length) await backup(replaced, join(BACKUP_DIR, stamp));
-    await savePending(keep, p.remote);
-    await gitOk(["reset", "-q", "--hard", p.remote]);
-    await finishPending();
-    await pruneBackups();
-    config.lastDownload = { at: new Date().toISOString(), commit: p.remote };
+    const history = await historyStatus(syncGit);
+    const dataIncoming = !!p.remote && p.remote !== p.head;
+    if (!dataIncoming && !historyIncoming(history)) throw new HttpError(409, "Nothing to download: this computer already has everything in the repository.");
+    if (dataIncoming) await checkDataDownload(p, resolutions);
+    // History first (refs only: your files aren't touched), so the builds that the new files start find
+    // their snapshots, and an unchanged resume isn't snapshotted again.
+    await downloadHistory(syncGit, GIT_DIR);
+    if (dataIncoming) await downloadData(p, resolutions);
+    config.lastDownload = { at: new Date().toISOString(), commit: p.remote ?? "" };
     config.lastCheck = { at: config.lastDownload.at };
     await writeConfig(config);
   });
   // Resumes rebuild on their own (the file watcher sees the new files); the lists refresh.
   emit({ type: "resumes" });
   return syncStatus();
+}
+
+/** Refuses before anything is downloaded: unanswered conflicts, or files that aren't Resume Studio data. */
+async function checkDataDownload(p: Plan, resolutions: Resolutions) {
+  const unresolved = [...p.conflicts.keys()].filter((x) => resolutions[x] !== "local" && resolutions[x] !== "remote");
+  if (unresolved.length) throw new HttpError(409, `Choose which version to keep for ${unresolved.length} file${unresolved.length === 1 ? "" : "s"} changed in both places.`);
+  // Only data paths may come from the repository: anything else would land in the app's own folder.
+  const remoteFiles = (await gitOk(["ls-tree", "-r", "-z", "--name-only", p.remote!])).split("\0").filter(Boolean);
+  const foreign = remoteFiles.filter((f) => !isSynced(f));
+  if (foreign.length) throw new HttpError(400, `The repository contains files that aren't Resume Studio data (${foreign.slice(0, 3).join(", ")}). Download refused, so nothing outside your data is touched.`);
+}
+
+/** The data part of a download (after checkDataDownload): the repository's files, with your unuploaded changes and choices kept. */
+async function downloadData(p: Plan, resolutions: Resolutions) {
+
+  // Kept and put back after the repository's version is checked out: your changes not uploaded yet, and
+  // the conflicts where you chose this computer's version. Replaced: conflicts where you chose the
+  // repository's (a copy goes to backups).
+  const keep = [...p.local.keys(), ...[...p.conflicts.keys()].filter((x) => resolutions[x] === "local")];
+  const replaced = [...p.conflicts.keys()].filter((x) => resolutions[x] === "remote");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  if (replaced.length) await backup(replaced, join(BACKUP_DIR, stamp));
+  await savePending(keep, p.remote!);
+  await gitOk(["reset", "-q", "--hard", p.remote!]);
+  await finishPending();
+  await pruneBackups();
 }
 
 /** Copies files (as they are here) under `dir`, keeping their paths. */

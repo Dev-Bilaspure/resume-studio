@@ -165,10 +165,12 @@ function Connected({
 }) {
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const working = busy !== null;
-  const incoming = status.remote.length + status.conflicts.length;
+  const h = status.history ?? { localSnapshots: 0, remoteSnapshots: 0, localLabels: [], remoteLabels: [], labelConflicts: [] };
+  const outgoing = status.local.length + h.localSnapshots + h.localLabels.length;
+  const incoming = status.remote.length + status.conflicts.length + h.remoteSnapshots + h.remoteLabels.length;
   const unchosen = status.conflicts.filter((c) => !choices[c.path]).length;
   const checkFailed = status.lastCheck?.error;
-  const inSync = !status.local.length && !incoming && !checkFailed && !status.remoteProblem && !!status.lastCheck;
+  const inSync = !outgoing && !incoming && !checkFailed && !status.remoteProblem && !!status.lastCheck;
   const uploadBlocked =
     status.blocked ?? (incoming ? "Download the repository's changes first, so nothing there is overwritten." : status.remoteProblem ? status.remoteProblem : null);
   const downloadBlocked = status.blocked ?? status.remoteProblem ?? (unchosen ? `Choose a version for ${unchosen} file${unchosen === 1 ? "" : "s"} changed in both places.` : null);
@@ -234,12 +236,14 @@ function Connected({
             empty="Nothing new here."
             items={status.local}
             side="local"
+            history={<HistoryRows snapshots={h.localSnapshots} labels={h.localLabels} />}
+            count={outgoing}
             action={
-              <ActionButton icon={<ArrowUpFromLine />} busy={busy === "uploading"} disabled={working || !status.local.length || !!uploadBlocked} onClick={onUpload}>
-                Upload {status.local.length || ""} change{status.local.length === 1 ? "" : "s"}
+              <ActionButton icon={<ArrowUpFromLine />} busy={busy === "uploading"} disabled={working || !outgoing || !!uploadBlocked} onClick={onUpload}>
+                Upload {outgoing || ""} change{outgoing === 1 ? "" : "s"}
               </ActionButton>
             }
-            note={status.local.length ? uploadBlocked : null}
+            note={outgoing ? uploadBlocked : null}
           />
 
           <ChangeList
@@ -247,6 +251,8 @@ function Connected({
             empty={status.lastCheck ? "Nothing new in the repository." : "Check the repository to see what's new there."}
             items={status.remote}
             side="remote"
+            history={<HistoryRows snapshots={h.remoteSnapshots} labels={h.remoteLabels} conflicts={h.labelConflicts} />}
+            count={incoming - status.conflicts.length}
             action={
               <ActionButton icon={<ArrowDownToLine />} busy={busy === "downloading"} disabled={working || !incoming || !!downloadBlocked} onClick={onDownload}>
                 Download {incoming || ""} change{incoming === 1 ? "" : "s"}
@@ -269,7 +275,7 @@ function Connected({
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect this computer?</AlertDialogTitle>
             <AlertDialogDescription>
-              Your files here and the repository stay as they are. {status.local.length ? `${status.local.length} change${status.local.length === 1 ? " isn't" : "s aren't"} uploaded yet. ` : ""}
+              Your files here and the repository stay as they are. {outgoing ? `${outgoing} change${outgoing === 1 ? " isn't" : "s aren't"} uploaded yet. ` : ""}
               You can connect again any time.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -311,6 +317,31 @@ function ActionButton({ icon, busy, disabled, onClick, children }: { icon: React
 
 // ---- Lists of changes -----------------------------------------------------------------------------------------
 
+/** "Snapshot history: 3 new snapshots · Label: first-resume › sent-to-acme". */
+function HistoryRows({ snapshots, labels, conflicts = [] }: { snapshots: number; labels: string[]; conflicts?: string[] }) {
+  if (!snapshots && !labels.length) return null;
+  return (
+    <li className="px-5 py-3">
+      <p className="text-sm font-medium">Snapshot history</p>
+      <ul className="mt-1.5 space-y-1 text-xs text-muted-foreground">
+        {snapshots > 0 && (
+          <li className="flex items-center gap-2">
+            <span className={cn("w-14 shrink-0 rounded px-1 py-0.5 text-center text-[10.5px] font-medium", CHANGE.added.cls)}>New</span>
+            {snapshots} snapshot{snapshots === 1 ? "" : "s"}
+          </li>
+        )}
+        {labels.map((l) => (
+          <li key={l} className="flex items-center gap-2">
+            <span className={cn("w-14 shrink-0 rounded px-1 py-0.5 text-center text-[10.5px] font-medium", CHANGE.modified.cls)}>Label</span>
+            <span className="truncate">{l.replace("/", " › ")}</span>
+            {conflicts.includes(l) && <span className="shrink-0 text-warning">changed in both places: this computer&apos;s is kept</span>}
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+}
+
 const CHANGE: Record<SyncChange, { label: string; cls: string }> = {
   added: { label: "New", cls: "bg-success/15 text-success" },
   modified: { label: "Changed", cls: "bg-primary/15 text-primary" },
@@ -329,6 +360,8 @@ function ChangeList({
   empty,
   items,
   side,
+  history,
+  count,
   action,
   note,
 }: {
@@ -336,6 +369,9 @@ function ChangeList({
   empty: string;
   items: SyncItem[];
   side: "local" | "remote";
+  /** Snapshot history rows (null when there's nothing to show). */
+  history: React.ReactNode;
+  count: number;
   action: React.ReactNode;
   note: string | null;
 }) {
@@ -344,15 +380,16 @@ function ChangeList({
     <section className="rounded-xl border bg-card">
       <header className="flex flex-wrap items-center gap-3 border-b px-5 py-3">
         <h2 className="text-sm font-medium">
-          {title} <span className="text-muted-foreground tabular-nums">({items.length})</span>
+          {title} <span className="text-muted-foreground tabular-nums">({count})</span>
         </h2>
         <div className="ml-auto">{action}</div>
         {note && <p className="w-full text-xs text-muted-foreground">{note}</p>}
       </header>
-      {items.length === 0 ? (
+      {count === 0 ? (
         <p className="px-5 py-4 text-sm text-muted-foreground">{empty}</p>
       ) : (
         <ul className="divide-y">
+          {history}
           {groups.map(([key, list]) => (
             <li key={key} className="px-5 py-3">
               <p className="text-sm font-medium">{list[0].groupLabel}</p>
@@ -486,15 +523,16 @@ function WhatIsSynced() {
           <li>Your resumes, and the tailored copies with their job postings</li>
           <li>Your facts: answers you gave, and topics you haven&apos;t done</li>
           <li>Tailoring sessions: questions, answers, suggestions, your choices</li>
-          <li>Which AI providers and models you use</li>
+          <li>Snapshot history, with its labels</li>
+          <li>Deleted resumes in the trash</li>
+          <li>Which AI providers and models you use, and your preferences (editor, preview, layout)</li>
         </ul>
       </div>
       <div>
         <p className="font-medium">Never synced</p>
         <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-muted-foreground">
           <li>API keys (they stay on this computer: enter them again on a new one)</li>
-          <li>PDFs and build files (rebuilt automatically)</li>
-          <li>Snapshot history and the trash</li>
+          <li>PDFs, previews and build files (rebuilt automatically)</li>
         </ul>
       </div>
     </section>
