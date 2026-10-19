@@ -1,14 +1,16 @@
 "use client";
 
 import "pdfjs-dist/legacy/web/pdf_viewer.css";
-import { ChevronDown, ChevronUp, Minus, Plus, Search, X } from "lucide-react";
+import { CaseSensitive, ChevronDown, ChevronUp, Minus, Plus, Search, WholeWord, X } from "lucide-react";
 import type { PDFDocumentProxy } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { ALT_KEY, FindToggle } from "@/components/find-controls";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { DOCUMENT_OPTIONS, loadPdfjs } from "./pdfjs";
+
 
 type ViewerLib = typeof import("pdfjs-dist/legacy/web/pdf_viewer.mjs");
 type Viewer = InstanceType<ViewerLib["PDFViewer"]>;
@@ -87,6 +89,8 @@ export const PdfPreview = forwardRef<PdfPreviewHandle, Props>(function PdfPrevie
   const [matches, setMatches] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
   const findInput = useRef<HTMLInputElement>(null);
   const queryRef = useRef("");
+  const [opts, setOpts] = useState({ caseSensitive: false, entireWord: false });
+  const optsRef = useRef(opts);
   const [scaleLabel, setScaleLabel] = useState("Fit width");
 
   useEffect(() => {
@@ -220,8 +224,7 @@ export const PdfPreview = forwardRef<PdfPreviewHandle, Props>(function PdfPrevie
           source: null,
           type: "",
           query: queryRef.current,
-          caseSensitive: false,
-          entireWord: false,
+          ...optsRef.current,
           highlightAll: true,
           findPrevious: false,
           matchDiacritics: false,
@@ -297,8 +300,9 @@ export const PdfPreview = forwardRef<PdfPreviewHandle, Props>(function PdfPrevie
   }, [updateScaleLabel]);
 
   // ---- Find in PDF and go to page ---------------------------------------------------------------------------
-  const find = (type: "" | "again", findPrevious = false, q = query) => {
+  const find = (type: "" | "again", findPrevious = false, q = query, o = opts) => {
     queryRef.current = q;
+    optsRef.current = o;
     const a = active();
     if (!a?.doc) return;
     if (!q) {
@@ -310,8 +314,7 @@ export const PdfPreview = forwardRef<PdfPreviewHandle, Props>(function PdfPrevie
       source: null,
       type,
       query: q,
-      caseSensitive: false,
-      entireWord: false,
+      ...o,
       highlightAll: true,
       findPrevious,
       matchDiacritics: false,
@@ -324,12 +327,28 @@ export const PdfPreview = forwardRef<PdfPreviewHandle, Props>(function PdfPrevie
     a.viewer.currentPageNumber = Math.max(1, Math.min(a.doc.numPages, Math.round(n)));
   };
 
-  // ⌘F inside the preview searches the PDF (in the editor it searches the source).
+  const closeFind = () => {
+    setFindOpen(false);
+    setQuery("");
+    find("", false, "");
+    // Back to the preview (focusable), so ⌘F there opens the bar again.
+    wrap.current?.parentElement?.focus();
+  };
+  const toggleOpt = (k: keyof typeof opts) => {
+    const o = { ...opts, [k]: !opts[k] };
+    setOpts(o);
+    find("", false, query, o);
+  };
+
+  // ⌘F inside the preview searches the PDF (in the editor it searches the source). Pressed in the find
+  // field itself, it closes the bar again, like Esc.
   useEffect(() => {
     const el = wrap.current?.parentElement;
     if (!el) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+        // In the find field itself, its own handler closes the bar.
+        if (e.target === findInput.current) return;
         e.preventDefault();
         setFindOpen(true);
         setTimeout(() => findInput.current?.select(), 0);
@@ -477,19 +496,27 @@ export const PdfPreview = forwardRef<PdfPreviewHandle, Props>(function PdfPrevie
                   find("", false, e.target.value);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setFindOpen(false);
-                    setQuery("");
-                    find("", false, "");
+                  if (e.key === "Escape" || ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f")) {
+                    e.preventDefault();
+                    closeFind();
                   } else if (e.key === "Enter" && e.shiftKey) {
                     e.preventDefault();
                     find("again", true);
+                  } else if (e.altKey && !e.metaKey && !e.ctrlKey && (e.code === "KeyC" || e.code === "KeyW")) {
+                    e.preventDefault();
+                    toggleOpt(e.code === "KeyC" ? "caseSensitive" : "entireWord");
                   }
                 }}
                 className="h-7 w-40 rounded-md border border-input bg-transparent px-2 text-xs outline-none focus:border-ring"
               />
-              <span className="w-14 text-center text-[11px] text-muted-foreground tabular-nums">
-                {query ? (matches.total ? `${matches.current}/${matches.total}` : "none") : ""}
+              <FindToggle className="size-6" label="Match case" keys={`${ALT_KEY}C`} on={opts.caseSensitive} onClick={() => toggleOpt("caseSensitive")}>
+                <CaseSensitive />
+              </FindToggle>
+              <FindToggle className="size-6" label="Match whole word" keys={`${ALT_KEY}W`} on={opts.entireWord} onClick={() => toggleOpt("entireWord")}>
+                <WholeWord />
+              </FindToggle>
+              <span className={cn("w-16 text-center text-[11px] tabular-nums", query && !matches.total ? "text-destructive" : "text-muted-foreground")} aria-live="polite">
+                {query ? (matches.total ? `${matches.current} of ${matches.total}` : "No results") : ""}
               </span>
               <Button type="button" variant="ghost" size="icon-xs" aria-label="Previous match" onClick={() => find("again", true)}>
                 <ChevronUp />
@@ -502,11 +529,7 @@ export const PdfPreview = forwardRef<PdfPreviewHandle, Props>(function PdfPrevie
                 variant="ghost"
                 size="icon-xs"
                 aria-label="Close search"
-                onClick={() => {
-                  setFindOpen(false);
-                  setQuery("");
-                  find("", false, "");
-                }}
+                onClick={closeFind}
               >
                 <X />
               </Button>

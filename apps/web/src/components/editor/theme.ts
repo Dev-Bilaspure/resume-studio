@@ -93,16 +93,7 @@ export const editorTheme = EditorView.theme(
     ".cm-completionMatchedText": { textDecoration: "none", color: "oklch(0.78 0.14 255)", fontWeight: "600" },
     ".cm-panels": { backgroundColor: "var(--card)", color: "var(--foreground)", borderColor: "var(--border)" },
     ".cm-panels.cm-panels-top": { borderBottom: "1px solid var(--border)" },
-    ".cm-search": {
-      padding: "8px 10px",
-      fontFamily: "var(--font-inter), sans-serif",
-      fontSize: "12.5px",
-      display: "flex",
-      flexWrap: "wrap",
-      gap: "6px",
-      alignItems: "center",
-    },
-    ".cm-search label": { display: "inline-flex", alignItems: "center", gap: "4px", color: "var(--muted-foreground)" },
+    // Fields and buttons of CodeMirror's own panels (go to line); the find bar is find-panel.tsx.
     ".cm-textfield": {
       backgroundColor: "var(--background)",
       border: "1px solid var(--input)",
@@ -122,7 +113,6 @@ export const editorTheme = EditorView.theme(
       padding: "3px 10px",
       fontSize: "12px",
     },
-    ".cm-panel.cm-search [name=close]": { color: "var(--muted-foreground)", fontSize: "16px", right: "8px", top: "6px" },
     ".cm-searchMatch": { backgroundColor: "oklch(0.82 0.15 80 / 22%)", outline: "1px solid oklch(0.82 0.15 80 / 45%)" },
     ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "oklch(0.82 0.15 80 / 45%)" },
     ".cm-flash-line": { animation: "cm-flash 1.4s ease-out" },

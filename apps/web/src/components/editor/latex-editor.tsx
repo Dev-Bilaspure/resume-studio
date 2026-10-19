@@ -26,6 +26,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { EditorSettings } from "@/lib/editor-settings";
 import type { Diagnostic, ProjectSymbols } from "@/lib/types";
 import { latexSupport } from "./latex-language";
+import { createFindPanel } from "./find-panel";
 import { editorTheme } from "./theme";
 
 export interface LatexEditorHandle {
@@ -151,7 +152,7 @@ export const LatexEditor = forwardRef<LatexEditorHandle, Props>(function LatexEd
       crosshairCursor(),
       highlightActiveLine(),
       highlightSelectionMatches(),
-      search({ top: true }),
+      search({ top: true, createPanel: createFindPanel }),
       wrapping.of(x.wrap),
       fontSize.of(x.font),
       spelling.of(x.spell),
