@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { findSecret, isSynced } from "../sync-rules.ts";
 
 test("only data is synced: resumes, facts, sessions, AI choices", () => {
-  for (const p of ["resumes/first-resume/main.tex", "resumes/first-resume/photo.png", "resumes/_profile/facts.json", "resumes/acme/jd.md", ".resume-studio/tailor/sessions/ts-mvefagb7-7fdh.json", ".resume-studio/ai.json"])
+  for (const p of ["resumes/first-resume/main.tex", "resumes/first-resume/photo.png", "resumes/_profile/facts.json", "resumes/acme/jd.md", ".resume-studio/tailor/sessions/ts-mvefagb7-7fdh.json", ".resume-studio/ai.json", ".resume-studio/preferences.json", ".resume-studio/trash/old-cv-2026-10-17T11-44-00-000Z/main.tex"])
     assert.equal(isSynced(p), true, p);
 });
 
@@ -20,6 +20,9 @@ test("nothing else: the app, builds, keys, history, junk, tricks", () => {
     ".resume-studio/git/HEAD",
     ".resume-studio/sync/config.json",
     ".resume-studio/tailor/work/ts-1/draft.pdf",
+    ".resume-studio/trash",
+    ".resume-studio/trash/old-cv",
+    ".resume-studio/snapshot-preview/x@abc/out/preview.pdf",
     ".resume-studio/tailor/sessions/../../../package.json",
     ".resume-studio/tailor/sessions/x.json.123.abcd.tmp",
     "resumes/_profile/facts.json.lock/x",

@@ -9,7 +9,7 @@ import { ROOT, STATE_DIR } from "./config";
 import { emit } from "./events";
 import { HttpError, atomicWrite } from "./fsutil";
 import { run } from "./run";
-import { findSecret, isSynced } from "./sync-rules";
+import { SYNCED_PLACES, findSecret, isSynced } from "./sync-rules";
 
 // Backup and sync of your data to a private git repository you own (e.g. on GitHub), by hand: Upload sends
 // what changed here, Download brings what changed there. The app owns a git repository for this
@@ -32,8 +32,7 @@ const BACKUP_DIR = join(SYNC_DIR, "backups");
 const BRANCH = "main";
 const REMOTE_REF = `refs/remotes/origin/${BRANCH}`;
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
-/** What git looks at: the synced places, so it never walks the rest of the folder (node_modules…). */
-const PATHSPEC = ["resumes", ".resume-studio/tailor/sessions", ".resume-studio/ai.json"];
+const PATHSPEC = SYNCED_PLACES;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const KEEP_BACKUPS = 20;
 
@@ -268,6 +267,12 @@ function describer(commits: (string | null)[]): Describe {
   };
   return async (path) => {
     if (path === ".resume-studio/ai.json") return { group: "settings", groupLabel: "AI provider settings", label: "ai.json" };
+    if (path === ".resume-studio/preferences.json") return { group: "settings", groupLabel: "Preferences (editor, preview, layout)", label: "preferences.json" };
+    const trashed = /^\.resume-studio\/trash\/([^/]+)\/(.+)$/.exec(path);
+    if (trashed) {
+      const meta = (await json(`.resume-studio/trash/${trashed[1]}/resume.json`)) as { name?: string } | null;
+      return { group: "trash", groupLabel: `Trash: ${meta?.name?.trim() || trashed[1]}`, label: trashed[2] };
+    }
     const session = /^\.resume-studio\/tailor\/sessions\/(.+)\.json$/.exec(path);
     if (session) {
       const s = (await json(path)) as { job?: { company?: string; role?: string } } | null;

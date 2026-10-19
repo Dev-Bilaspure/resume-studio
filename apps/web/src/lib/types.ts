@@ -206,7 +206,7 @@ export type SyncChange = "added" | "modified" | "deleted";
 export interface SyncItem {
   path: string;
   change: SyncChange;
-  group: "resume" | "facts" | "session" | "settings";
+  group: "resume" | "facts" | "session" | "trash" | "settings";
   /** "First resume", "Your facts", "Tailoring: Backend Engineer · Proofpoint". */
   groupLabel: string;
   /** The file within it: "main.tex". */
