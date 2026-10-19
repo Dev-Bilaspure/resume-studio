@@ -68,15 +68,4 @@ export function slugify(name: string): string {
   );
 }
 
-/** Editor temp/backup files and OS clutter: never compiled, listed, or snapshotted. */
-export function isJunk(name: string): boolean {
-  return (
-    name === ".DS_Store" ||
-    name.endsWith("~") ||
-    name.endsWith(".swp") ||
-    name.endsWith(".swx") ||
-    name.endsWith(".tmp") ||
-    name.startsWith(".#") ||
-    name.startsWith("#")
-  );
-}
+export { isJunk } from "./junk";
