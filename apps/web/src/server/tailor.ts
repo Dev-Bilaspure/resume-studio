@@ -211,6 +211,15 @@ const WORKING = new Set<Session["status"]>(["created", "analyzing", "writing", "
  */
 const isInterrupted = (s: Session) => WORKING.has(s.status) && !running.has(s.id);
 
+/** Whether a tailoring run in progress is working from this resume (it reads its files and builds drafts). */
+export async function tailoringRunFor(resumeId: string): Promise<boolean> {
+  for (const id of running.keys()) {
+    const s = await sessionStore.get(id).catch(() => null);
+    if (s?.context.resumeId === resumeId) return true;
+  }
+  return false;
+}
+
 export async function getSession(id: string): Promise<Session & { running: boolean; interrupted: boolean }> {
   const s = await sessionStore.get(id);
   if (!s) throw new HttpError(404, "No such tailoring session");
