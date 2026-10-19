@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Cloud, Copy, FileText, Loader2, MoreHorizontal, Plus, Settings2, Sparkles, TriangleAlert, Upload } from "lucide-react";
+import { Check, Cloud, Copy, FileText, Loader2, MoreHorizontal, Plus, Settings2, Sparkles, Trash2, TriangleAlert, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -10,6 +10,16 @@ import { TexSetupHint } from "@/components/tex-setup-hint";
 import { NewResumeDialog } from "@/components/new-resume-dialog";
 import { TailoringStrip } from "@/components/tailor/tailoring-strip";
 import { PdfThumb } from "@/components/preview/pdf-thumb";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -76,6 +86,7 @@ export function ResumeGallery() {
   const [creating, setCreating] = useState<{ duplicateOf: ResumeSummary | null } | null>(null);
   const [importing, setImporting] = useState(false);
   const [aiSettings, setAiSettings] = useState(false);
+  const [deleting, setDeleting] = useState<ResumeSummary | null>(null);
   const zipInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -100,6 +111,18 @@ export function ResumeGallery() {
       setResumes((list) => list?.map((x) => (x.id === r.id ? { ...x, application: meta.application } : x)) ?? list);
     } catch (e) {
       toast.error("Couldn't update the application", { description: (e as Error).message });
+    }
+  };
+
+  // Moves the folder to .resume-studio/trash (after a final snapshot), so it can be recovered.
+  const remove = async (r: ResumeSummary) => {
+    setDeleting(null);
+    try {
+      await api.remove(r.id);
+      setResumes((list) => list?.filter((x) => x.id !== r.id) ?? list);
+      toast.success(`Deleted “${r.name}”`, { description: "It's in .resume-studio/trash, and in the snapshot history." });
+    } catch (e) {
+      toast.error("Couldn't delete", { description: (e as Error).message });
     }
   };
 
@@ -274,6 +297,10 @@ export function ResumeGallery() {
                         <Copy />
                         Duplicate…
                       </DropdownMenuItem>
+                      <DropdownMenuItem variant="destructive" onClick={() => setDeleting(r)}>
+                        <Trash2 />
+                        Delete…
+                      </DropdownMenuItem>
                       {r.application && (
                         <>
                           <DropdownMenuSeparator />
@@ -297,6 +324,22 @@ export function ResumeGallery() {
         )}
       </main>
       <AiSettingsDialog open={aiSettings} onOpenChange={setAiSettings} />
+      <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{deleting?.name}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The folder moves to <span className="font-mono">.resume-studio/trash/</span> and a final snapshot is kept, so it can be recovered.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => deleting && void remove(deleting)}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <NewResumeDialog open={creating !== null} onOpenChange={(o) => !o && setCreating(null)} duplicateOf={creating?.duplicateOf ?? null} />
     </div>
   );
