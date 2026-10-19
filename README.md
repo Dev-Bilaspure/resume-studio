@@ -61,6 +61,7 @@ resumes/<name>/          your resumes: main.tex (+ any \input files, .cls, image
   build/<name>/          latexmk aux files (incremental builds)
   publish/<name>/        the PDFs the preview shows (last few builds)
   git/                   snapshot history (a git repo the app owns; it never touches this repo)
+  sync/                  Backup & sync: its own git repo, the connection, and backups of replaced files
   trash/                 deleted resumes (move a folder back into resumes/ to recover it)
 ```
 
@@ -177,6 +178,28 @@ an independent judge (a) audit the tailored text against the original for anythi
 (`eval-results/<run>/report.md`) shows how often the tailored resume is the one advanced, the fit change,
 and every truthfulness issue. Runs resume where they stopped (e.g. after a usage limit). The data and
 results stay on your machine.
+
+## Backup & sync
+
+**Sync** (home page) keeps your data in a private git repository you own, so losing this folder, or moving
+to another computer, loses nothing:
+
+1. Create an empty **private** repository (GitHub or any git host), only for this.
+2. Paste its address on the Sync page. Your git login on this computer is used: if `git push` to it works
+   in a terminal, it works here. A public GitHub repository is refused.
+3. **Upload** sends what changed here; **Download** brings what changed there. The page lists both, file by
+   file, with the changes, before you click.
+
+Restoring: clone this project, `pnpm install && pnpm dev`, open Sync, connect the same repository,
+Download. PDFs rebuild by themselves; enter your API keys again (they're never uploaded).
+
+Synced: `resumes/` (resumes, tailored copies, `jd.md`, your facts), tailoring sessions and your AI provider
+choices. Never synced: API keys, build files and PDFs, snapshot history, the trash.
+
+A file changed both here and in the repository is shown side by side: you choose which to keep, and a
+version from this computer that's replaced is saved in `.resume-studio/sync/backups/` first. Uploads refuse
+anything that looks like an API key or token, downloads refuse a repository containing anything but this
+data, and a download interrupted half-way is finished the next time you sync.
 
 ## Shortcuts
 
