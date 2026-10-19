@@ -197,3 +197,58 @@ export interface WordCount {
   text: number;
   raw: string;
 }
+
+// ---- Sync (backup to your own private git repository) ---------------------------------------------------------
+
+export type SyncChange = "added" | "modified" | "deleted";
+
+/** One synced file that differs between this computer and the repository. */
+export interface SyncItem {
+  path: string;
+  change: SyncChange;
+  group: "resume" | "facts" | "session" | "settings";
+  /** "First resume", "Your facts", "Tailoring: Backend Engineer · Proofpoint". */
+  groupLabel: string;
+  /** The file within it: "main.tex". */
+  label: string;
+}
+
+/** Changed here and in the repository, differently: you choose which to keep. */
+export interface SyncConflict extends Omit<SyncItem, "change"> {
+  localChange: SyncChange;
+  remoteChange: SyncChange;
+}
+
+export interface SyncStatus {
+  connected: boolean;
+  url?: string;
+  /** The repository's page, when it's on GitHub. */
+  webUrl?: string;
+  /** An upload or download is running. */
+  busy: boolean;
+  /** Why syncing has to wait right now. */
+  blocked?: string;
+  lastUpload?: { at: string; commit: string };
+  lastDownload?: { at: string; commit: string };
+  /** When the repository was last asked what's new, and what went wrong if it couldn't be reached. */
+  lastCheck?: { at: string; error?: string };
+  /** An upload or download has happened from this computer. */
+  everSynced?: boolean;
+  /** The repository has nothing in it yet (known after a check). */
+  remoteEmpty?: boolean;
+  /** Something in the repository stops downloads (files that aren't Resume Studio data). */
+  remoteProblem?: string;
+  /** Here, not uploaded. */
+  local: SyncItem[];
+  /** In the repository, not downloaded (as of the last check). */
+  remote: SyncItem[];
+  conflicts: SyncConflict[];
+}
+
+export interface SyncDiff {
+  path: string;
+  binary: boolean;
+  /** Unified diff. */
+  text: string;
+}
+
