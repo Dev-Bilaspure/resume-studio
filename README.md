@@ -27,6 +27,8 @@ brew install poppler                # pdftotext/pdffonts/pdfinfo for the ATS che
 
 (Linux: TeX Live's installer or `texlive-full`, and `poppler-utils`.) `RESUME_STUDIO_COMPILER=local` or
 `service` in `apps/web/.env.local` pins the choice; see [the compile service](packages/tex-service/README.md).
+All settings, with their defaults, are in [`apps/web/.env.example`](apps/web/.env.example): copy it to
+`apps/web/.env.local` to change one.
 On Windows, run the app in WSL 2.
 
 Production mode: `pnpm build && pnpm start`. The server only answers on 127.0.0.1.
