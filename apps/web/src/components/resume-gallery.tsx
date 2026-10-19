@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, FileText, Loader2, MoreHorizontal, Plus, Settings2, Sparkles, TriangleAlert, Upload } from "lucide-react";
+import { Check, Cloud, Copy, FileText, Loader2, MoreHorizontal, Plus, Settings2, Sparkles, TriangleAlert, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type ResumeSummary } from "@/lib/api";
+import { syncApi } from "@/lib/sync-api";
 import { relativeTime } from "@/lib/format";
 import type { ApplicationStatus, SystemStatus } from "@/lib/types";
 import { useServerEvents } from "@/lib/use-events";
@@ -48,6 +49,24 @@ function ScoreBadge({ score }: { score: number | null }) {
     >
       ATS {score}
     </span>
+  );
+}
+
+/** Backup & sync, with how many changes here aren't uploaded yet (from the last sync; no network). */
+function SyncButton() {
+  const [pending, setPending] = useState<number | null>(null);
+  useEffect(() => {
+    syncApi.status().then(
+      (s) => setPending(s.connected ? s.local.length : null),
+      () => {},
+    );
+  }, []);
+  return (
+    <Button size="sm" variant="ghost" nativeButton={false} render={<Link href="/sync" />} title={pending ? `${pending} change${pending === 1 ? "" : "s"} not uploaded` : "Backup & sync"}>
+      <Cloud />
+      Sync
+      {pending ? <span className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground tabular-nums">{pending}</span> : null}
+    </Button>
   );
 }
 
@@ -125,6 +144,7 @@ export function ResumeGallery() {
               <Plus />
               New resume
             </Button>
+            <SyncButton />
             <Button size="sm" variant="ghost" aria-label="AI providers" title="AI providers" onClick={() => setAiSettings(true)}>
               <Settings2 />
             </Button>
