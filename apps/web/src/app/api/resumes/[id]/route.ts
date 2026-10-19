@@ -6,6 +6,7 @@ import { dropCompiler } from "@/server/compiler";
 import { emit } from "@/server/events";
 import { compilerFor } from "@/server/runtime";
 import { createSnapshot } from "@/server/snapshots";
+import { tailoringRunFor } from "@/server/tailor";
 import { getResume, listFiles, trashResume, updateResume } from "@/server/workspace";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -48,6 +49,11 @@ export const PATCH = handler(async (req: Request, { params }: Ctx) => {
 export const DELETE = handler(async (_req: Request, { params }: Ctx) => {
   const { id } = await params;
   await getResume(id);
+  if (await tailoringRunFor(id)) {
+    throw new HttpError(409, "A tailoring run is using this resume. Wait for it to finish, or stop it (it takes a few seconds to stop), then delete.");
+  }
+  // A build in progress would keep writing this resume's files: let it finish first.
+  await (await compilerFor(id)).idle();
   // Snapshot first: the history keeps the resume even after the folder goes to the trash.
   await createSnapshot(id, { message: "Before deleting the resume", auto: true }).catch(() => null);
   await trashResume(id);
