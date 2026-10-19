@@ -193,8 +193,15 @@ to another computer, loses nothing:
 Restoring: clone this project, `pnpm install && pnpm dev`, open Sync, connect the same repository,
 Download. PDFs rebuild by themselves; enter your API keys again (they're never uploaded).
 
-Synced: `resumes/` (resumes, tailored copies, `jd.md`, your facts), tailoring sessions and your AI provider
-choices. Never synced: API keys, build files and PDFs, snapshot history, the trash.
+Synced: everything that can't be rebuilt. `resumes/` (resumes, tailored copies, `jd.md`, your facts),
+tailoring sessions, snapshot history with its labels, deleted resumes in the trash, your AI provider
+choices and your preferences (editor settings, preview zoom, pane sizes: kept by the browser and mirrored to
+`.resume-studio/preferences.json`). Never synced: API keys, and PDFs and build files (rebuilt).
+
+Snapshot history is the `snapshots` branch of the repository, labels its `snap/…` tags, next to the data on
+`main`; an upload sends all three in one push, so the repository is never left half-updated. When two
+computers both took snapshots, a download joins the two histories and keeps every snapshot. A label
+changed on both sides keeps this computer's placement.
 
 A file changed both here and in the repository is shown side by side: you choose which to keep, and a
 version from this computer that's replaced is saved in `.resume-studio/sync/backups/` first. Uploads refuse
