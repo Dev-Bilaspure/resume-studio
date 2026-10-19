@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+import { PreferencesMirror } from "@/components/preferences-mirror";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full">
         <TooltipProvider delay={300}>{children}</TooltipProvider>
         <Toaster position="bottom-right" />
+        <PreferencesMirror />
       </body>
     </html>
   );

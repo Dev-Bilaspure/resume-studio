@@ -52,6 +52,10 @@ async function gitOk(args: string[]) {
 }
 
 let ready: Promise<void> | null = null;
+/** The snapshot repository, created on first use (also by Backup & sync, when it downloads a history). */
+export function ensureSnapshotRepo(): Promise<void> {
+  return ensureRepo();
+}
 function ensureRepo(): Promise<void> {
   return (ready ??= (async () => {
     await mkdir(RESUMES_DIR, { recursive: true });
@@ -85,7 +89,9 @@ export async function listSnapshots(id: string): Promise<SnapshotInfo[]> {
   await ensureRepo();
   const head = await git(["rev-parse", "--verify", "-q", "HEAD"]);
   if (head.code !== 0) return [];
-  const log = await gitOk(["log", `--format=${REC}%H${SEP}%ct${SEP}%s${SEP}%b${SEP}`, "--shortstat", "--", `${id}/`]);
+  // --full-history: a history joined from two computers (by Backup & sync) keeps both sides' snapshots of
+  // this resume; --no-merges: the join itself isn't a snapshot.
+  const log = await gitOk(["log", "--full-history", "--no-merges", `--format=${REC}%H${SEP}%ct${SEP}%s${SEP}%b${SEP}`, "--shortstat", "--", `${id}/`]);
   const tags = await gitOk(["for-each-ref", `refs/tags/snap/${id}/`, "--format=%(objectname) %(refname:lstrip=4)"]);
   const labels = new Map<string, string[]>();
   for (const line of tags.split("\n").filter(Boolean)) {

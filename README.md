@@ -27,6 +27,8 @@ brew install poppler                # pdftotext/pdffonts/pdfinfo for the ATS che
 
 (Linux: TeX Live's installer or `texlive-full`, and `poppler-utils`.) `RESUME_STUDIO_COMPILER=local` or
 `service` in `apps/web/.env.local` pins the choice; see [the compile service](packages/tex-service/README.md).
+All settings, with their defaults, are in [`apps/web/.env.example`](apps/web/.env.example): copy it to
+`apps/web/.env.local` to change one.
 On Windows, run the app in WSL 2.
 
 Production mode: `pnpm build && pnpm start`. The server only answers on 127.0.0.1.
@@ -61,6 +63,7 @@ resumes/<name>/          your resumes: main.tex (+ any \input files, .cls, image
   build/<name>/          latexmk aux files (incremental builds)
   publish/<name>/        the PDFs the preview shows (last few builds)
   git/                   snapshot history (a git repo the app owns; it never touches this repo)
+  sync/                  Backup & sync: its own git repo, the connection, and backups of replaced files
   trash/                 deleted resumes (move a folder back into resumes/ to recover it)
 ```
 
@@ -177,6 +180,35 @@ an independent judge (a) audit the tailored text against the original for anythi
 (`eval-results/<run>/report.md`) shows how often the tailored resume is the one advanced, the fit change,
 and every truthfulness issue. Runs resume where they stopped (e.g. after a usage limit). The data and
 results stay on your machine.
+
+## Backup & sync
+
+**Sync** (home page) keeps your data in a private git repository you own, so losing this folder, or moving
+to another computer, loses nothing:
+
+1. Create an empty **private** repository (GitHub or any git host), only for this.
+2. Paste its address on the Sync page. Your git login on this computer is used: if `git push` to it works
+   in a terminal, it works here. A public GitHub repository is refused.
+3. **Upload** sends what changed here; **Download** brings what changed there. The page lists both, file by
+   file, with the changes, before you click.
+
+Restoring: clone this project, `pnpm install && pnpm dev`, open Sync, connect the same repository,
+Download. PDFs rebuild by themselves; enter your API keys again (they're never uploaded).
+
+Synced: everything that can't be rebuilt. `resumes/` (resumes, tailored copies, `jd.md`, your facts),
+tailoring sessions, snapshot history with its labels, deleted resumes in the trash, your AI provider
+choices and your preferences (editor settings, preview zoom, pane sizes: kept by the browser and mirrored to
+`.resume-studio/preferences.json`). Never synced: API keys, and PDFs and build files (rebuilt).
+
+Snapshot history is the `snapshots` branch of the repository, labels its `snap/…` tags, next to the data on
+`main`; an upload sends all three in one push, so the repository is never left half-updated. When two
+computers both took snapshots, a download joins the two histories and keeps every snapshot. A label
+changed on both sides keeps this computer's placement.
+
+A file changed both here and in the repository is shown side by side: you choose which to keep, and a
+version from this computer that's replaced is saved in `.resume-studio/sync/backups/` first. Uploads refuse
+anything that looks like an API key or token, downloads refuse a repository containing anything but this
+data, and a download interrupted half-way is finished the next time you sync.
 
 ## Shortcuts
 
