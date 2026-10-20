@@ -8,9 +8,9 @@
     "start": "pnpm --filter @resume-studio/web start",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "biome check . && turbo run lint",
-    "fix": "biome check --write . && turbo run fix",
-    "format": "biome format --write .",
+    "biome:lint": "biome check . && turbo run lint",
+    "biome:fix": "biome check --write . && turbo run fix",
+    "biome:format": "biome format --write .",
     "tailor": "node packages/tailor-cli/bin/resume-tailor.js",
     "eval": "node packages/tailor-eval/bin/tailor-eval.js"
   },
