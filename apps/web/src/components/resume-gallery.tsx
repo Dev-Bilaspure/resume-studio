@@ -193,7 +193,7 @@ export function ResumeGallery() {
             </div>
           </div>
         )}
-        {system && system.tex.available && !system.ats.available && (
+        {system?.tex.available && !system.ats.available && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm text-muted-foreground">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" />
             <p>

@@ -250,7 +250,7 @@ export function MatchDot({ status }: { status?: "strong" | "weak" | "missing" })
   const cls =
     status === "strong" ? "bg-success" : status === "weak" ? "bg-warning" : status === "missing" ? "bg-destructive" : "bg-muted-foreground/40 animate-pulse";
   const label = status === "strong" ? "Clearly shown" : status === "weak" ? "Partly shown" : status === "missing" ? "Not shown" : "Checking";
-  return <span title={label} aria-label={label} className={cn("mt-1.5 size-2 shrink-0 rounded-full", cls)} />;
+  return <span role="img" title={label} aria-label={label} className={cn("mt-1.5 size-2 shrink-0 rounded-full", cls)} />;
 }
 
 // ---- Questions ----------------------------------------------------------------------------------------------

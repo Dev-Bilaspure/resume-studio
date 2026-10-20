@@ -26,16 +26,16 @@ export async function analyzePdf(pdfPath: string, sources: Record<string, string
   }
   const [r, st] = await Promise.all([inspectPdf(pdfPath, { text: true, layout: true, fonts: true, info: true }), stat(pdfPath)]);
   const { text, layout, fonts, info } = r;
-  if (!text || text.code !== 0) return null;
+  if (text?.code !== 0) return null;
   const meta = parsePdfinfo(info?.stdout ?? "");
   return runAtsChecks({
     text: text.stdout,
     layoutText: layout?.code === 0 ? layout.stdout : undefined,
-    pages: Number(meta["Pages"]) || 1,
+    pages: Number(meta.Pages) || 1,
     fileSizeKB: Math.round(st.size / 1024),
     fonts: parsePdffonts(fonts?.stdout ?? ""),
-    title: meta["Title"] || null,
-    author: meta["Author"] || null,
+    title: meta.Title || null,
+    author: meta.Author || null,
     sources,
     mainFile,
   });

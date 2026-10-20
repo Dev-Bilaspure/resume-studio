@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { after, before, test } from "node:test";
-import { createTexServiceClient, memoryEntries, sha256, TexServiceError, type TexServiceClient } from "./client.ts";
+import { createTexServiceClient, memoryEntries, sha256, type TexServiceError, type TexServiceClient } from "./client.ts";
 import type { TexServiceConfig } from "./config.ts";
 import { createTexService, type TexService } from "./server.ts";
 

@@ -251,7 +251,7 @@ function findLists(M: string, from: number, to: number, macros: ReturnType<typeo
 }
 
 /** The bullets directly in a list: \item … and item macros (\resumeItem{…}). */
-function itemsOf(M: string, T: string, env: Env, macros: ReturnType<typeof scanMacros>): Omit<ItemSpan, "id" | "listId">[] {
+function itemsOf(M: string, _T: string, env: Env, macros: ReturnType<typeof scanMacros>): Omit<ItemSpan, "id" | "listId">[] {
   const itemMacro = macros.itemMacros.size ? `|\\\\(?:${alt(macros.itemMacros)})(?![A-Za-z@])` : "";
   const re = new RegExp(`\\\\item(?![A-Za-z@])${itemMacro}`, "g");
   const marks: { start: number; tokenEnd: number; macro: boolean }[] = [];
@@ -265,7 +265,7 @@ function itemsOf(M: string, T: string, env: Env, macros: ReturnType<typeof scanM
     if (mk.macro) {
       const { args } = readArgs(M, mk.tokenEnd, 1);
       const a = args[0];
-      if (!a || a.kind !== "req" || a.end > limit) return;
+      if (a?.kind !== "req" || a.end > limit) return;
       const [s, e] = trimRange(M, a.start, a.end);
       if (s >= e) return;
       out.push({ chunkStart: mk.start, coreEnd: a.end + 1, contentStart: s, contentEnd: e });
@@ -304,7 +304,7 @@ function skillLines(M: string, T: string, from: number, to: number): { label: st
   let m: RegExpExecArray | null;
   while ((m = labelRe.exec(M)) && m.index < to) {
     let label = m[1].trim();
-    let p = m.index + m[0].length;
+    const p = m.index + m[0].length;
     let itemsStart = -1;
     let groupEnd = -1;
     const ws = /^\s*/.exec(M.slice(p))![0].length;

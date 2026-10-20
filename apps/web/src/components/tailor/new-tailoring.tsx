@@ -363,7 +363,7 @@ export function NewTailoring({ resumeId }: { resumeId: string | null }) {
                     <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-card to-transparent" aria-hidden />
                   </div>
                 )}
-                {baseResume && baseResume.build.status && baseResume.build.status !== "ok" && (
+                {baseResume?.build.status && baseResume.build.status !== "ok" && (
                   <p className="mt-2 text-xs text-warning">This resume&apos;s last build failed. Fix it in the editor first so drafts can be checked.</p>
                 )}
                 <p className="mt-2 text-xs text-muted-foreground">The original isn&apos;t changed. The result is saved as a new resume.</p>

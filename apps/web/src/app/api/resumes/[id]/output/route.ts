@@ -16,7 +16,7 @@ export const GET = handler(async (req: Request, { params }: Ctx) => {
     headers: {
       "Content-Type": TEXT.test(file) ? "text/plain; charset=utf-8" : "application/octet-stream",
       "Content-Security-Policy": "sandbox",
-      ...(download ? { "Content-Disposition": `attachment; filename="${file.replace(/[^\w.\-]/g, "_")}"` } : {}),
+      ...(download ? { "Content-Disposition": `attachment; filename="${file.replace(/[^\w.-]/g, "_")}"` } : {}),
       ...noStore,
     },
   });

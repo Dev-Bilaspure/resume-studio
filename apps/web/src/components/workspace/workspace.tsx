@@ -644,7 +644,7 @@ export function WorkspaceView({ id }: { id: string }) {
                       <button type="button" onClick={() => void ws.openFile(p)} className="max-w-48 truncate">
                         {p}
                       </button>
-                      {dirty.has(p) ? <span className="size-1.5 rounded-full bg-foreground/70 group-hover:hidden" aria-label="Unsaved" /> : null}
+                      {dirty.has(p) ? <span role="img" className="size-1.5 rounded-full bg-foreground/70 group-hover:hidden" aria-label="Unsaved" /> : null}
                       {ws.tabs.length > 1 && (
                         <button
                           type="button"

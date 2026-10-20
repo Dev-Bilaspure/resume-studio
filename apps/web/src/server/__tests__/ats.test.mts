@@ -120,8 +120,8 @@ Helvetica                            Type 1            WinAnsi          no  no  
   assert.equal(fonts[1].unicodeMap, false);
   assert.equal(fonts[2].embedded, false);
   const info = parsePdfinfo("Title:           Alex Morgan — Resume\nPages:           1\nPage size:       612 x 792 pts (letter)\n");
-  assert.equal(info["Title"], "Alex Morgan — Resume");
-  assert.equal(info["Pages"], "1");
+  assert.equal(info.Title, "Alex Morgan — Resume");
+  assert.equal(info.Pages, "1");
 });
 
 test("pdffonts rows whose long names overflow the column", () => {

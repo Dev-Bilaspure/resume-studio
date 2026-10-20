@@ -180,7 +180,7 @@ export function FileTree({ resumeId, files, mainFile, openPath, dirty, onOpen, o
                       {iconFor(f)}
                       <span className="truncate">{f.path.split("/").pop()}</span>
                       {isMain && <Star className="size-3 shrink-0 fill-current text-warning" aria-label="Main file" />}
-                      {dirty.has(f.path) && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground/70" aria-label="Unsaved" />}
+                      {dirty.has(f.path) && <span role="img" className="ml-auto size-1.5 shrink-0 rounded-full bg-foreground/70" aria-label="Unsaved" />}
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-48">
                       {f.kind === "file" && /\.(tex|xtx|ltx)$/.test(f.path) && !isMain && (

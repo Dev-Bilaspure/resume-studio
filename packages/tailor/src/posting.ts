@@ -16,7 +16,7 @@ export async function readPosting(llm: LLM, text: string, signal?: AbortSignal):
     step: "read-posting",
   });
   const d = res.data;
-  const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
+  const clean = (v: string | null) => (v?.trim() ? v.trim() : null);
   const role = clean(d.role);
   return { ...d, company: clean(d.company), role, suggestedRole: clean(d.suggestedRole) ?? role ?? "Software Engineer", location: clean(d.location) };
 }

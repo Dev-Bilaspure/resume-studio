@@ -54,7 +54,7 @@ test("every edit kind, and nothing else changes", () => {
   const out = source.files["main.tex"];
   assert.match(out, /\\item Cut p99 checkout latency \\textbf\{75\\%\} \(480 ms \$\\rightarrow\$ 120 ms\) with \\textbf\{Apache Kafka\} consumers\./);
   assert.doesNotMatch(out, /Introduced SLOs and error budgets/);
-  assert.match(out, /cost by 32\\%\.\n  \\item Wrote the on-call runbook used by 9 teams\.\n  \\item Designed/);
+  assert.match(out, /cost by 32\\%\.\n {2}\\item Wrote the on-call runbook used by 9 teams\.\n {2}\\item Designed/);
   assert.match(out, /\\textbf\{Languages:\} Go, SQL, Python\\par/);
   assert.match(out, /Staff Backend Engineer\\sep \\mbox\{San Francisco, CA\}/);
   assert.match(out, /\\section\{Summary\}\nBackend engineer focused on \\textbf\{payments\} at scale\.\n\n%/);
@@ -97,7 +97,7 @@ test("macro bullets (Jake's \\resumeItem) and custom list macros", () => {
   ]);
   assert.match(
     source.files["main.tex"],
-    /\\resumeItemListStart\n        \\resumeItem\{Led the data pipeline\}\n        \\resumeItem\{Built a \\textbf\{REST API\} in \\textbf\{FastAPI\} on \\textbf\{PostgreSQL\}\}\n        \\resumeItem\{Explored/,
+    /\\resumeItemListStart\n {8}\\resumeItem\{Led the data pipeline\}\n {8}\\resumeItem\{Built a \\textbf\{REST API\} in \\textbf\{FastAPI\} on \\textbf\{PostgreSQL\}\}\n {8}\\resumeItem\{Explored/,
   );
 });
 

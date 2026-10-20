@@ -14,7 +14,7 @@ export const PROJECT_RC_FILES = ["latexmkrc", ".latexmkrc"] as const;
  * builds are the same on every machine). They match what Overleaf sets up, so projects that build there
  * build here.
  */
-export const BUILTIN_LATEXMKRC = String.raw`# Written by Resume Studio; loaded for every build.
+export const BUILTIN_LATEXMKRC = `# Written by Resume Studio; loaded for every build.
 
 # latex (DVI) engine: DVI → PDF with dvipdfmx, which keeps SyncTeX positions and needs no Ghostscript.
 $dvipdf = 'dvipdfmx %O -o %D %S';

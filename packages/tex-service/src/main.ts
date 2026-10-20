@@ -1,9 +1,9 @@
 // tex-service: the compile service. Configured by the environment (see config.ts and the README).
 import { mkdirSync } from "node:fs";
-import { configFromEnv } from "./config.ts";
+import { configFromEnv, type TexServiceConfig } from "./config.ts";
 import { createTexService } from "./server.ts";
 
-let config;
+let config: TexServiceConfig;
 try {
   config = configFromEnv();
 } catch (e) {
@@ -13,7 +13,7 @@ try {
 
 // TeX and fontconfig write caches under these; they must exist (in the image they point into /data).
 for (const dir of [process.env.HOME, process.env.TEXMFVAR, process.env.TEXMFCONFIG, process.env.XDG_CACHE_HOME, process.env.PAR_GLOBAL_TMPDIR]) {
-  if (dir && dir.startsWith(config.dataDir)) mkdirSync(dir, { recursive: true });
+  if (dir?.startsWith(config.dataDir)) mkdirSync(dir, { recursive: true });
 }
 
 const service = await createTexService(config);

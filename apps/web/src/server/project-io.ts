@@ -80,7 +80,7 @@ async function auditTree(root: string): Promise<{ bytes: number }> {
         // A link to a file inside the archive becomes a copy of it; any other link is dropped, so
         // nothing can point out of the project.
         const target = await realpath(full).catch(() => null);
-        const inside = target !== null && target.startsWith(realRoot + "/");
+        const inside = typeof target === "string" && target.startsWith(realRoot + "/");
         const isFile = inside && (await stat(target).catch(() => null))?.isFile();
         await rm(full, { force: true });
         if (isFile && target) {

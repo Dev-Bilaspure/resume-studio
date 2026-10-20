@@ -253,6 +253,12 @@ export function HistoryPanel({ resumeId, previewingSha, onPreview, onCompare, be
                                 ev.stopPropagation();
                                 void api.removeLabel(resumeId, l).catch((err) => toast.error((err as Error).message));
                               }}
+                              onKeyDown={(ev) => {
+                                if (ev.key !== "Enter" && ev.key !== " ") return;
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                void api.removeLabel(resumeId, l).catch((err) => toast.error((err as Error).message));
+                              }}
                             >
                               <X className="size-2.5!" />
                             </span>
