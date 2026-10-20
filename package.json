@@ -8,11 +8,14 @@
     "start": "pnpm --filter @resume-studio/web start",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "lint": "turbo run lint",
+    "lint": "biome check . && turbo run lint",
+    "fix": "biome check --write . && turbo run fix",
+    "format": "biome format --write .",
     "tailor": "node packages/tailor-cli/bin/resume-tailor.js",
     "eval": "node packages/tailor-eval/bin/tailor-eval.js"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "turbo": "^2.6.0"
   },
   "packageManager": "pnpm@10.28.2"

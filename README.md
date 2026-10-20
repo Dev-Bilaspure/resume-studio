@@ -227,8 +227,15 @@ data, and a download interrupted half-way is finished the next time you sync.
 ```sh
 pnpm test        # log parser, ATS checks, SyncTeX, engine detection, the compile service, the engine
 pnpm typecheck
-pnpm lint
+pnpm lint        # Biome (formatting and lint, whole repo) and ESLint (Next.js and React rules, web app)
+pnpm fix         # applies what both can fix safely, and formats
+pnpm format      # formatting only
 ```
+
+[Biome](https://biomejs.dev) formats and lints everything; its settings are in `biome.json` (recommended
+rules, a few turned off where they don't fit this code). ESLint stays in the web app for what Biome doesn't
+cover: Next.js, React hooks and the React compiler, and keeping server-only code out of the browser. With
+the Biome extension, VS Code and Cursor format on save (`.vscode/settings.json`).
 
 Server code is in `apps/web/src/server/` (compiler, log parser, ATS checks, SyncTeX, snapshots, file watcher),
 the API in `apps/web/src/app/api/`, the UI in `apps/web/src/components/`.
