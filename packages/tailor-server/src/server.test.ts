@@ -39,10 +39,23 @@ function scriptedLLM(): LLM {
       const m = /BULLET \[(b\d+)\]: (.+)/.exec(String(req.prompt))!;
       return {
         strategy: "Lead with Kafka.",
-        edits: [{ op: "rewrite_bullet", target: m[1], text: `${m[2].replace(/\.$/, "")} reliably.`, after: null, order: null, reason: "r", requirements: ["r1"], evidence: [{ kind: "bullet", id: m[1] }] }],
+        edits: [
+          {
+            op: "rewrite_bullet",
+            target: m[1],
+            text: `${m[2].replace(/\.$/, "")} reliably.`,
+            after: null,
+            order: null,
+            reason: "r",
+            requirements: ["r1"],
+            evidence: [{ kind: "bullet", id: m[1] }],
+          },
+        ],
       };
     },
-    fact_check: (req) => ({ verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })) }),
+    fact_check: (req) => ({
+      verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })),
+    }),
   };
   return {
     provider: "anthropic",
@@ -50,7 +63,13 @@ function scriptedLLM(): LLM {
     async generate<T>(req: GenerateRequest<T>) {
       const f = script[req.schemaName ?? ""];
       if (!f) throw new Error(`no script for ${req.schemaName}`);
-      return { data: req.schema.parse(f(req as GenerateRequest<unknown>)), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 }, provider: "anthropic", model: "scripted", durationMs: 1 };
+      return {
+        data: req.schema.parse(f(req as GenerateRequest<unknown>)),
+        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        provider: "anthropic",
+        model: "scripted",
+        durationMs: 1,
+      };
     },
   };
 }
@@ -112,7 +131,9 @@ test("bad requests are explained", async () => {
 });
 
 test("a session runs to ready with live events, then previews and finalizes", { skip: !hasTex && "TeX isn't installed" }, async () => {
-  const r = await call("/v1/sessions", { body: { job, source: { main: "main.tex", files: { "main.tex": classic } }, options: { askQuestions: false }, context: { user: "u1" } } });
+  const r = await call("/v1/sessions", {
+    body: { job, source: { main: "main.tex", files: { "main.tex": classic } }, options: { askQuestions: false }, context: { user: "u1" } },
+  });
   assert.equal(r.status, 202);
   const started = (await r.json()) as { id: string; context: Record<string, string>; source?: unknown };
   assert.equal(started.context.user, "u1");
@@ -131,7 +152,10 @@ test("a session runs to ready with live events, then previews and finalizes", { 
     }
   })();
 
-  let s: { status: string; edits?: { id: string; status: string }[]; running: boolean; report?: { after: { build?: { text?: string; pages: number } } } } = { status: "", running: true };
+  let s: { status: string; edits?: { id: string; status: string }[]; running: boolean; report?: { after: { build?: { text?: string; pages: number } } } } = {
+    status: "",
+    running: true,
+  };
   for (let i = 0; i < 120 && s.status !== "ready" && s.status !== "failed"; i++) {
     await new Promise((res) => setTimeout(res, 500));
     s = (await (await call(`/v1/sessions/${started.id}`)).json()) as typeof s;
@@ -147,7 +171,9 @@ test("a session runs to ready with live events, then previews and finalizes", { 
   const pv = (await (await call(`/v1/sessions/${started.id}/preview`, { body: { accepted: [] } })).json()) as { build: { ok: boolean; pages: number } };
   assert.deepEqual([pv.build.ok, pv.build.pages], [true, 1]);
 
-  const fin = (await (await call(`/v1/sessions/${started.id}/finalize`, { body: { accepted: [s.edits![0].id] } })).json()) as { source: { files: Record<string, string> } };
+  const fin = (await (await call(`/v1/sessions/${started.id}/finalize`, { body: { accepted: [s.edits![0].id] } })).json()) as {
+    source: { files: Record<string, string> };
+  };
   assert.match(fin.source.files["main.tex"], /reliably\./);
 
   assert.equal((await call(`/v1/sessions/${started.id}`, { method: "DELETE" })).status, 204);

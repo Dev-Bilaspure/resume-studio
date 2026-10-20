@@ -62,12 +62,27 @@ if (command === "report") {
   const judgeLLM = createLLM({ provider: (opt["judge-provider"] ?? opt.provider) as ProviderId, model: opt["judge-model"]! });
   const metaFile = join(outDir, "meta.json");
   if (!existsSync(metaFile)) {
-    writeFileSync(metaFile, JSON.stringify({ engine: `${engineLLM.provider} · ${engineLLM.model}`, judge: `${judgeLLM.provider} · ${judgeLLM.model}`, startedAt: new Date().toISOString(), data: dataDir }, null, 2) + "\n");
+    writeFileSync(
+      metaFile,
+      JSON.stringify(
+        {
+          engine: `${engineLLM.provider} · ${engineLLM.model}`,
+          judge: `${judgeLLM.provider} · ${judgeLLM.model}`,
+          startedAt: new Date().toISOString(),
+          data: dataDir,
+        },
+        null,
+        2,
+      ) + "\n",
+    );
   }
 
   let cases = loadCases(dataDir);
   if (opt.only) {
-    const keys = opt.only.split(",").map((k) => k.trim()).filter(Boolean);
+    const keys = opt.only
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean);
     cases = cases.filter((c) => keys.some((k) => c.id.includes(k)));
   }
   const done = new Set(readResults(outDir).map((r) => r.id));
@@ -86,7 +101,9 @@ if (command === "report") {
       const r = await runCase(c, { engineLLM, judgeLLM, signal: ctl.signal, onStep: log, questions: opt.questions });
       writeFileSync(join(outDir, "cases", `${c.id}.json`), JSON.stringify(r, null, 2) + "\n");
       const yn = (b?: boolean) => (b === undefined ? "–" : b ? "yes" : "no");
-      log(`${r.status}: advanced ${yn(r.screen?.original.advance)} → ${yn(r.screen?.tailored.advance)}, fit ${r.screen ? `${r.screen.original.fit} → ${r.screen.tailored.fit}` : "–"}, audit ${r.audit ? r.audit.issues.length : "–"} issue(s)`);
+      log(
+        `${r.status}: advanced ${yn(r.screen?.original.advance)} → ${yn(r.screen?.tailored.advance)}, fit ${r.screen ? `${r.screen.original.fit} → ${r.screen.tailored.fit}` : "–"}, audit ${r.audit ? r.audit.issues.length : "–"} issue(s)`,
+      );
     } catch (e) {
       if (isStopError(e)) {
         stopped = (e as Error).message;
@@ -96,13 +113,29 @@ if (command === "report") {
       log(`error: ${(e as Error).message}`);
       writeFileSync(
         join(outDir, "cases", `${c.id}.json`),
-        JSON.stringify({ id: c.id, resume: c.resume.id, jd: c.posting.id, posting: c.posting, status: "failed", error: (e as Error).message, engine: {}, judge: {}, finishedAt: new Date().toISOString() }, null, 2) + "\n",
+        JSON.stringify(
+          {
+            id: c.id,
+            resume: c.resume.id,
+            jd: c.posting.id,
+            posting: c.posting,
+            status: "failed",
+            error: (e as Error).message,
+            engine: {},
+            judge: {},
+            finishedAt: new Date().toISOString(),
+          },
+          null,
+          2,
+        ) + "\n",
       );
     }
   }
   const results = writeReport(outDir);
   const s = summarize(results);
-  console.log(`\n${s.ready}/${s.cases} tailored · advanced ${s.originalAdvanced} → ${s.tailoredAdvanced} of ${s.screened} (gained ${s.gained}, lost ${s.lost}) · audit clean ${s.audit.clean}/${s.audit.audited}`);
+  console.log(
+    `\n${s.ready}/${s.cases} tailored · advanced ${s.originalAdvanced} → ${s.tailoredAdvanced} of ${s.screened} (gained ${s.gained}, lost ${s.lost}) · audit clean ${s.audit.clean}/${s.audit.audited}`,
+  );
   console.log(`Report: ${join(outDir, "report.md")}`);
   if (stopped) {
     console.log(`\nStopped: ${stopped}\nRun the same command again to continue.`);

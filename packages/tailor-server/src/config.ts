@@ -47,6 +47,10 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): ServerConfi
 }
 
 export function checkConfig(c: ServerConfig) {
-  if (!c.apiKey && !isLoopback(c.host)) throw new Error(`Listening on ${c.host} needs TAILOR_API_KEY: without it anyone who can reach the server could use your provider credentials.`);
-  if (!c.providers.length) throw new Error("No provider is configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_VERTEX_PROJECT + GOOGLE_VERTEX_LOCATION, or TAILOR_ENABLE_CLAUDE_CODE=1.");
+  if (!c.apiKey && !isLoopback(c.host))
+    throw new Error(`Listening on ${c.host} needs TAILOR_API_KEY: without it anyone who can reach the server could use your provider credentials.`);
+  if (!c.providers.length)
+    throw new Error(
+      "No provider is configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_VERTEX_PROJECT + GOOGLE_VERTEX_LOCATION, or TAILOR_ENABLE_CLAUDE_CODE=1.",
+    );
 }

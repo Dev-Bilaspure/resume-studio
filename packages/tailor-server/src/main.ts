@@ -13,7 +13,9 @@ try {
 }
 const server = createTailorServer(config);
 server.listen(config.port, config.host, () => {
-  console.log(`tailor-server on http://${config.host}:${config.port} · providers: ${config.providers.map((p) => p.provider).join(", ")}${config.apiKey ? " · auth on" : ""}`);
+  console.log(
+    `tailor-server on http://${config.host}:${config.port} · providers: ${config.providers.map((p) => p.provider).join(", ")}${config.apiKey ? " · auth on" : ""}`,
+  );
 });
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {

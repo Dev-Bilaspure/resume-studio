@@ -8,16 +8,9 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
-    "lib": [
-      "ES2023",
-      "DOM"
-    ],
-    "types": [
-      "node"
-    ],
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
     "erasableSyntaxOnly": true
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }

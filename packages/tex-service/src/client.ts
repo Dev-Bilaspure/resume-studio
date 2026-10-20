@@ -86,7 +86,10 @@ export function createTexServiceClient(opts: TexServiceClientOptions): TexServic
     } catch (e) {
       if (timeout.aborted) throw new TexServiceError("timeout", `The compile service at ${base} didn't answer within ${Math.round(init.timeoutMs / 1000)}s`);
       if (init.signal?.aborted) throw e;
-      throw new TexServiceError("unreachable", `Can't reach the compile service at ${base} (${describe(e)}). Start it with \`docker compose up -d\` in the repository folder.`);
+      throw new TexServiceError(
+        "unreachable",
+        `Can't reach the compile service at ${base} (${describe(e)}). Start it with \`docker compose up -d\` in the repository folder.`,
+      );
     }
     const text = await res.text();
     if (!res.ok) {
@@ -202,7 +205,10 @@ const hashCache = new Map<string, { sig: string; sha: string }>();
  * The files of a folder, as sync entries. `include(path, name, isDirectory)` decides what's part of the
  * project (default: everything but hidden files and folders).
  */
-export async function folderEntries(dir: string, include: (path: string, name: string, isDirectory: boolean) => boolean = (_p, n) => !n.startsWith(".")): Promise<SourceEntry[]> {
+export async function folderEntries(
+  dir: string,
+  include: (path: string, name: string, isDirectory: boolean) => boolean = (_p, n) => !n.startsWith("."),
+): Promise<SourceEntry[]> {
   const out: SourceEntry[] = [];
   async function walk(rel: string) {
     for (const e of await readdir(join(dir, rel), { withFileTypes: true }).catch(() => [])) {

@@ -263,4 +263,3 @@ export interface SyncDiff {
   /** Unified diff. */
   text: string;
 }
-

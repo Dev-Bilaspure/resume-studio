@@ -17,7 +17,13 @@ function scriptedLLM(script: Record<string, (req: GenerateRequest<unknown>) => u
       calls.push(name);
       const f = script[name];
       if (!f) throw new Error(`no script for ${name}`);
-      return { data: req.schema.parse(f(req as GenerateRequest<unknown>)), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 }, provider: "claude-code", model: "test", durationMs: 1 };
+      return {
+        data: req.schema.parse(f(req as GenerateRequest<unknown>)),
+        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        provider: "claude-code",
+        model: "test",
+        durationMs: 1,
+      };
     },
   };
 }
@@ -32,11 +38,17 @@ const doc: ResumeDoc = {
       title: "Experience",
       context: "",
       skills: [],
-      lists: [{ id: "l1", heading: "Acme", bullets: [
-        { id: "b1", text: "Built **Node.js** services on **AWS Lambda**." },
-        { id: "b2", text: "Cut failures **60%** with **Temporal**." },
-        { id: "b3", text: "Developed a **React** editor." },
-      ] }],
+      lists: [
+        {
+          id: "l1",
+          heading: "Acme",
+          bullets: [
+            { id: "b1", text: "Built **Node.js** services on **AWS Lambda**." },
+            { id: "b2", text: "Cut failures **60%** with **Temporal**." },
+            { id: "b3", text: "Developed a **React** editor." },
+          ],
+        },
+      ],
     },
   ],
   plainText: "",
@@ -80,7 +92,10 @@ test("every proposed edit is accounted for: kept, repaired or shown as dropped",
     requirement_matches: () => ({ matches: [{ requirementId: "r1", status: "missing", evidence: [], note: "n" }], questions: [] }),
     resume_edits: (req) =>
       String(req.system).includes("fixing resume edits")
-        ? { strategy: "fixed", edits: [{ ...edit("rewrite_bullet", "b2", "Cut failures **60%** with **Temporal** workflows."), reason: "Names the workflow engine." }] }
+        ? {
+            strategy: "fixed",
+            edits: [{ ...edit("rewrite_bullet", "b2", "Cut failures **60%** with **Temporal** workflows."), reason: "Names the workflow engine." }],
+          }
         : {
             strategy: "s",
             edits: [
@@ -99,13 +114,20 @@ test("every proposed edit is accounted for: kept, repaired or shown as dropped",
     }),
   });
   const engine = createTailorEngine({ llm, adapter });
-  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s0 = await engine.start({
+    job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" },
+    source: { main: "main.tex", files: { "main.tex": "" } },
+  });
   const s = await engine.run(s0.id);
   assert.equal(s.status, "ready", s.error?.message);
   assert.deepEqual(s.fit && [s.fit.level, s.fit.must.total, s.fit.gaps], ["long-shot", 1, ["Kubernetes"]], "the fit is assessed from the matching");
   const byTarget = Object.fromEntries((s.edits ?? []).map((e) => [`${e.change.op}:${e.change.target}:${e.status}`, e]));
   assert.deepEqual(Object.keys(byTarget).sort(), ["remove_bullet:b3:ok", "rewrite_bullet:b1:dropped", "rewrite_bullet:b2:ok", "set_headline:h1:ok"].sort());
-  assert.match(byTarget["rewrite_bullet:b2:ok"].revisedFrom!.issues.join(), /“Led a platform team”/, "a repaired edit keeps what was wrong with its first version");
+  assert.match(
+    byTarget["rewrite_bullet:b2:ok"].revisedFrom!.issues.join(),
+    /“Led a platform team”/,
+    "a repaired edit keeps what was wrong with its first version",
+  );
   assert.match(byTarget["rewrite_bullet:b2:ok"].revisedFrom!.text, /^Led a platform team/);
   assert.match(byTarget["rewrite_bullet:b1:dropped"].issues!.join(), /10M/);
   assert.equal(byTarget["rewrite_bullet:b1:dropped"].dropReason, "checks", "a dropped edit says why");
@@ -115,7 +137,13 @@ test("every proposed edit is accounted for: kept, repaired or shown as dropped",
   // Ids are unique, and only kept edits reach the document.
   const ids = s.edits!.map((e) => e.id);
   assert.equal(new Set(ids).size, ids.length);
-  assert.deepEqual(applied.at(-1)!.sort(), s.edits!.filter((e) => e.status !== "dropped").map((e) => e.id).sort());
+  assert.deepEqual(
+    applied.at(-1)!.sort(),
+    s
+      .edits!.filter((e) => e.status !== "dropped")
+      .map((e) => e.id)
+      .sort(),
+  );
 });
 
 test("questions pause the session; answers become facts and resume it", async () => {
@@ -128,12 +156,26 @@ test("questions pause the session; answers become facts and resume it", async ()
     facts: () => ({ facts: [{ questionId: "q1", text: "Ran the Temporal workers on Kubernetes (AKS).", skills: ["Kubernetes"] }] }),
     resume_edits: (req) => {
       const fact = /FACT \[(f-[^\]]+)\]/.exec(String(req.prompt))?.[1];
-      return { strategy: "s", edits: [{ ...edit("rewrite_bullet", "b2", "Cut failures **60%** with **Temporal** workers on **Kubernetes**."), evidence: [{ kind: "bullet", id: "b2" }, { kind: "fact", id: fact }] }] };
+      return {
+        strategy: "s",
+        edits: [
+          {
+            ...edit("rewrite_bullet", "b2", "Cut failures **60%** with **Temporal** workers on **Kubernetes**."),
+            evidence: [
+              { kind: "bullet", id: "b2" },
+              { kind: "fact", id: fact },
+            ],
+          },
+        ],
+      };
     },
     fact_check: () => ({ verdicts: [] }),
   });
   const engine = createTailorEngine({ llm, adapter });
-  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s0 = await engine.start({
+    job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" },
+    source: { main: "main.tex", files: { "main.tex": "" } },
+  });
   const paused = await engine.run(s0.id);
   assert.equal(paused.status, "needs_input");
   assert.equal(paused.questions![0].id, "q1");
@@ -155,10 +197,15 @@ test("a failed run resumes with retry, keeping the steps that finished", async (
       if (limited) throw new Error("usage limit reached");
       return { strategy: "s", edits: [edit("rewrite_bullet", "b2", "Cut failures **60%** using **Temporal**.")] };
     },
-    fact_check: (req) => ({ verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })) }),
+    fact_check: (req) => ({
+      verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })),
+    }),
   });
   const engine = createTailorEngine({ llm, adapter });
-  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s0 = await engine.start({
+    job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" },
+    source: { main: "main.tex", files: { "main.tex": "" } },
+  });
   const failed = await engine.run(s0.id);
   assert.equal(failed.status, "failed");
   assert.equal((await engine.run(s0.id)).status, "failed", "run() alone retries a failed session too, and fails the same way");
@@ -176,18 +223,32 @@ test("a failed run resumes with retry, keeping the steps that finished", async (
 
 test("a pasted posting alone is enough: the engine reads its title, level and location", async () => {
   const llm = scriptedLLM({
-    posting_details: () => ({ company: null, role: "Founding Engineer", suggestedRole: "Founding Engineer", seniority: "mid", location: "Bangalore", workModel: "onsite" }),
+    posting_details: () => ({
+      company: null,
+      role: "Founding Engineer",
+      suggestedRole: "Founding Engineer",
+      seniority: "mid",
+      location: "Bangalore",
+      workModel: "onsite",
+    }),
     job_profile: () => profile,
     requirement_matches: () => ({ matches: [{ requirementId: "r1", status: "strong", evidence: [{ kind: "bullet", id: "b1" }], note: "n" }], questions: [] }),
     resume_edits: () => ({ strategy: "s", edits: [] }),
     fact_check: () => ({ verdicts: [] }),
   });
   const engine = createTailorEngine({ llm, adapter });
-  const s0 = await engine.start({ job: { company: "", role: "", description: "A YC-backed Voice AI company is hiring. ".repeat(5) }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s0 = await engine.start({
+    job: { company: "", role: "", description: "A YC-backed Voice AI company is hiring. ".repeat(5) },
+    source: { main: "main.tex", files: { "main.tex": "" } },
+  });
   const s = await engine.run(s0.id);
   assert.equal(s.status, "ready", s.error?.message);
   assert.equal(llm.calls[0], "posting_details");
-  assert.deepEqual([s.job.role, s.job.company, s.job.seniority, s.job.location], ["Founding Engineer", "", "mid", "Bangalore"], "an unnamed company stays unnamed");
+  assert.deepEqual(
+    [s.job.role, s.job.company, s.job.seniority, s.job.location],
+    ["Founding Engineer", "", "mid", "Bangalore"],
+    "an unnamed company stays unnamed",
+  );
   // Retried or resumed, it isn't read twice.
   await engine.retry(s.id);
   assert.equal(llm.calls.filter((c) => c === "posting_details").length, 1);
@@ -209,13 +270,26 @@ test("a 'haven't done this' is remembered: never evidence, shown to later runs a
     resume_edits: (req) => {
       const lacks = /FACT \[(f-[^\]]+)\]/.exec(String(req.prompt))?.[1];
       // A model that tries to cite the declined topic anyway.
-      return { strategy: "s", edits: [{ ...edit("rewrite_bullet", "b2", "Cut failures **60%** using **Temporal**."), evidence: [{ kind: "bullet", id: "b2" }, ...(lacks ? [{ kind: "fact", id: lacks }] : [{ kind: "fact", id: saved[0]?.id ?? "x" }])] }] };
+      return {
+        strategy: "s",
+        edits: [
+          {
+            ...edit("rewrite_bullet", "b2", "Cut failures **60%** using **Temporal**."),
+            evidence: [{ kind: "bullet", id: "b2" }, ...(lacks ? [{ kind: "fact", id: lacks }] : [{ kind: "fact", id: saved[0]?.id ?? "x" }])],
+          },
+        ],
+      };
     },
-    fact_check: (req) => ({ verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })) }),
+    fact_check: (req) => ({
+      verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })),
+    }),
     repair: () => ({ strategy: "s", edits: [] }),
   });
   const engine = createTailorEngine({ llm, adapter, facts });
-  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s0 = await engine.start({
+    job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" },
+    source: { main: "main.tex", files: { "main.tex": "" } },
+  });
   assert.equal((await engine.run(s0.id)).status, "needs_input");
   await engine.answer(s0.id, [{ questionId: "q1", none: true }]);
   const done = await engine.run(s0.id);
@@ -227,7 +301,10 @@ test("a 'haven't done this' is remembered: never evidence, shown to later runs a
   assert.match(done.edits![0].issues!.join(), /said they haven't done/);
 
   // The next run is told, and isn't asked again.
-  const s1 = await engine.start({ job: { company: "Beta", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s1 = await engine.start({
+    job: { company: "Beta", role: "Backend Engineer", description: "Kubernetes" },
+    source: { main: "main.tex", files: { "main.tex": "" } },
+  });
   const next = await engine.run(s1.id);
   assert.match(matchPrompt, /NOT DONE: Kubernetes/);
   assert.doesNotMatch(matchPrompt, /FACT \[/, "not shown as something they did");
@@ -239,10 +316,15 @@ test("the review's choice of edits is saved with each preview", async () => {
     job_profile: () => profile,
     requirement_matches: () => ({ matches: [{ requirementId: "r1", status: "missing", evidence: [], note: "n" }], questions: [] }),
     resume_edits: () => ({ strategy: "s", edits: [edit("rewrite_bullet", "b2", "Cut failures **60%** using **Temporal**."), edit("remove_bullet", "b3", "")] }),
-    fact_check: (req) => ({ verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })) }),
+    fact_check: (req) => ({
+      verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })),
+    }),
   });
   const engine = createTailorEngine({ llm, adapter });
-  const s0 = await engine.start({ job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" }, source: { main: "main.tex", files: { "main.tex": "" } } });
+  const s0 = await engine.start({
+    job: { company: "Acme", role: "Backend Engineer", description: "Kubernetes" },
+    source: { main: "main.tex", files: { "main.tex": "" } },
+  });
   const s = await engine.run(s0.id);
   assert.equal(s.selection, undefined, "nothing chosen yet");
   await engine.preview(s0.id, ["e2", "nope"]);

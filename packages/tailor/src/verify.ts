@@ -92,7 +92,12 @@ export function beforeText(ix: DocIndex, change: EditOp): string {
  * evidence for that entry's bullets (the project is in Go even if no bullet says so).
  */
 export function entryHeading(ix: DocIndex, change: EditOp): string {
-  const listId = change.op === "rewrite_bullet" || change.op === "remove_bullet" ? ix.bullets.get(change.target)?.listId : change.op === "add_bullet" ? change.target : undefined;
+  const listId =
+    change.op === "rewrite_bullet" || change.op === "remove_bullet"
+      ? ix.bullets.get(change.target)?.listId
+      : change.op === "add_bullet"
+        ? change.target
+        : undefined;
   return listId ? (ix.lists.get(listId)?.heading ?? "") : "";
 }
 

@@ -57,10 +57,23 @@ const Start = z.object({
   /** Binary files the document needs (images, fonts, PDFs), base64. */
   assets: z.record(z.string().max(300), z.string()).optional(),
   options: z
-    .object({ maxPages: z.number().int().min(1).max(4).optional(), allowHeadline: z.boolean().optional(), allowNewSkills: z.boolean().optional(), askQuestions: z.boolean().optional() })
+    .object({
+      maxPages: z.number().int().min(1).max(4).optional(),
+      allowHeadline: z.boolean().optional(),
+      allowNewSkills: z.boolean().optional(),
+      askQuestions: z.boolean().optional(),
+    })
     .optional(),
   facts: z
-    .array(z.object({ id: z.string().max(100), text: z.string().min(1).max(2000), skills: z.array(z.string().max(100)).max(50), source: z.enum(["answer", "manual", "import"]), createdAt: z.string() }))
+    .array(
+      z.object({
+        id: z.string().max(100),
+        text: z.string().min(1).max(2000),
+        skills: z.array(z.string().max(100)).max(50),
+        source: z.enum(["answer", "manual", "import"]),
+        createdAt: z.string(),
+      }),
+    )
     .max(500)
     .optional(),
   provider: z.enum(["claude-code", "openai", "anthropic", "vertex"]).optional(),
@@ -68,7 +81,9 @@ const Start = z.object({
   /** Yours to keep on the session (user id, resume id…); the engine doesn't read it. */
   context: z.record(z.string().max(100), z.string().max(1000)).optional(),
 });
-const Answers = z.object({ answers: z.array(z.object({ questionId: z.string(), text: z.string().max(4000).optional(), none: z.boolean().optional() })).max(50) });
+const Answers = z.object({
+  answers: z.array(z.object({ questionId: z.string(), text: z.string().max(4000).optional(), none: z.boolean().optional() })).max(50),
+});
 const Accepted = z.object({ accepted: z.array(z.string()).max(500) });
 
 // ---- Helpers ----------------------------------------------------------------------------------------------
@@ -148,7 +163,12 @@ export function createTailorServer(config: ServerConfig, deps: ServerDeps = {}):
   function providerConfig(provider: ProviderId | undefined, model: string | undefined) {
     const id = provider ?? config.defaultProvider;
     const p = config.providers.find((x) => x.provider === id);
-    if (!p) throw new HttpError(400, "provider_unavailable", `Provider ${id} isn't configured on this server. Available: ${config.providers.map((x) => x.provider).join(", ")}`);
+    if (!p)
+      throw new HttpError(
+        400,
+        "provider_unavailable",
+        `Provider ${id} isn't configured on this server. Available: ${config.providers.map((x) => x.provider).join(", ")}`,
+      );
     const m = model ?? config.defaultModels[p.provider] ?? PROVIDERS.find((x) => x.id === p.provider)?.defaultModel;
     if (!m) throw new HttpError(400, "model_required", `Name a model for ${p.provider}`);
     return { ...p, model: m };
@@ -165,7 +185,13 @@ export function createTailorServer(config: ServerConfig, deps: ServerDeps = {}):
 
   function engineFor(s: { id: string; context: Record<string, string> }) {
     const llm = llmFor(s.context._provider as ProviderId, s.context._model);
-    return createTailorEngine({ llm, adapter: latexAdapter, verifier: defaultVerifier({ assetsDir: assetsDir(s.id) }), store, onEvent: (id, e, sess) => broadcast(id, e, sess) });
+    return createTailorEngine({
+      llm,
+      adapter: latexAdapter,
+      verifier: defaultVerifier({ assetsDir: assetsDir(s.id) }),
+      store,
+      onEvent: (id, e, sess) => broadcast(id, e, sess),
+    });
   }
 
   /** Runs a session in the background, at most `concurrency` at a time. */

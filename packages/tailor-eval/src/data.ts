@@ -48,7 +48,15 @@ export function parseFrontMatter(text: string): { fields: Record<string, string>
   return { fields, body: m[2].trim() };
 }
 
-const LEVELS: Record<string, Seniority> = { intern: "intern", junior: "junior", "new-grad": "junior", mid: "mid", senior: "senior", staff: "staff", principal: "principal" };
+const LEVELS: Record<string, Seniority> = {
+  intern: "intern",
+  junior: "junior",
+  "new-grad": "junior",
+  mid: "mid",
+  senior: "senior",
+  staff: "staff",
+  principal: "principal",
+};
 
 export function jobInput(p: Posting): JobInput {
   return { company: p.company, role: p.role, seniority: p.level ? LEVELS[p.level] : undefined, description: p.description, location: p.location, link: p.url };
@@ -63,7 +71,16 @@ export function loadPostings(dataDir: string): Posting[] {
       const { fields, body } = parseFrontMatter(readFileSync(join(dir, f), "utf8"));
       // A posting can be pasted as it came (no front matter): the engine reads company and title from it.
       if (body.length < 200) throw new Error(`${f}: needs the posting's text`);
-      return { id: f.replace(/\.(md|txt)$/, ""), company: fields.company ?? "", role: fields.role ?? "", level: fields.level, family: fields.family, location: fields.location, url: fields.url, description: body };
+      return {
+        id: f.replace(/\.(md|txt)$/, ""),
+        company: fields.company ?? "",
+        role: fields.role ?? "",
+        level: fields.level,
+        family: fields.family,
+        location: fields.location,
+        url: fields.url,
+        description: body,
+      };
     });
 }
 

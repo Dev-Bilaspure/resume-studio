@@ -18,9 +18,19 @@ const exp = doc.sections.find((s) => s.lists.length)!;
 const l = exp.lists[0];
 const skills = doc.sections.find((s) => s.skills.length)?.skills[0];
 const edits = [
-  { id: "e1", change: { op: "rewrite_bullet" as const, target: l.bullets[0].id, text: "Cut failures **60%** & costs $2B → 50% with C# / C++ in \"prod\" — 100_000 jobs (~2x)" } },
+  {
+    id: "e1",
+    change: {
+      op: "rewrite_bullet" as const,
+      target: l.bullets[0].id,
+      text: 'Cut failures **60%** & costs $2B → 50% with C# / C++ in "prod" — 100_000 jobs (~2x)',
+    },
+  },
   { id: "e2", change: { op: "remove_bullet" as const, target: l.bullets[l.bullets.length - 1].id } },
-  { id: "e3", change: { op: "add_bullet" as const, target: l.id, after: l.bullets[0].id, text: "Added bullet with a [link](https://example.com/a_b%20c) and *italic*." } },
+  {
+    id: "e3",
+    change: { op: "add_bullet" as const, target: l.id, after: l.bullets[0].id, text: "Added bullet with a [link](https://example.com/a_b%20c) and *italic*." },
+  },
   ...(skills ? [{ id: "e4", change: { op: "rewrite_skills" as const, target: skills.id, text: "Go, TypeScript, Kubernetes" } }] : []),
   ...(doc.headline ? [{ id: "e5", change: { op: "set_headline" as const, target: doc.headline.id, text: "Backend Software Engineer" } }] : []),
 ];

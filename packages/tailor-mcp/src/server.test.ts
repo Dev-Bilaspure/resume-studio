@@ -45,10 +45,23 @@ function scriptedLLM(): LLM {
       const list = /ENTRY \[(l\d+)\]/.exec(String(req.prompt))![1];
       return {
         strategy: "Show the Terraform work.",
-        edits: [{ op: "add_bullet", target: list, text: "Wrote **Terraform** modules for the staging VPC.", after: null, order: null, reason: "Shows the must-have.", requirements: ["r1"], evidence: [{ kind: "fact", id: fact }] }],
+        edits: [
+          {
+            op: "add_bullet",
+            target: list,
+            text: "Wrote **Terraform** modules for the staging VPC.",
+            after: null,
+            order: null,
+            reason: "Shows the must-have.",
+            requirements: ["r1"],
+            evidence: [{ kind: "fact", id: fact }],
+          },
+        ],
       };
     },
-    fact_check: (req) => ({ verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })) }),
+    fact_check: (req) => ({
+      verdicts: [...String(req.prompt).matchAll(/<edit id="(e\d+)">/g)].map((m) => ({ editId: m[1], verdict: "supported", problems: [] })),
+    }),
   };
   return {
     provider: "anthropic",
@@ -56,7 +69,13 @@ function scriptedLLM(): LLM {
     async generate<T>(req: GenerateRequest<T>) {
       const f = script[req.schemaName ?? ""];
       if (!f) throw new Error(`no script for ${req.schemaName}`);
-      return { data: req.schema.parse(f(req as GenerateRequest<unknown>)), usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 }, provider: "anthropic", model: "scripted", durationMs: 1 };
+      return {
+        data: req.schema.parse(f(req as GenerateRequest<unknown>)),
+        usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+        provider: "anthropic",
+        model: "scripted",
+        durationMs: 1,
+      };
     },
   };
 }
@@ -93,7 +112,12 @@ test("questions, answers, review and saving to a new folder", { skip: !hasTex &&
   const first = textOf(
     await client.callTool({
       name: "tailor_resume",
-      arguments: { resume_path: resume, company: "Northwind", role: "Platform Engineer", job_description: "We need Terraform and Kubernetes experience for our platform team. ".repeat(3) },
+      arguments: {
+        resume_path: resume,
+        company: "Northwind",
+        role: "Platform Engineer",
+        job_description: "We need Terraform and Kubernetes experience for our platform team. ".repeat(3),
+      },
     }),
   );
   assert.match(first, /needs_input/);
@@ -101,7 +125,12 @@ test("questions, answers, review and saving to a new folder", { skip: !hasTex &&
   assert.match(first, /Never answer for them/);
   const id = /Session (\S+)/.exec(first)![1];
 
-  const done = textOf(await client.callTool({ name: "answer_tailoring_questions", arguments: { session_id: id, answers: [{ question_id: "q1", answer: "Terraform modules for our staging VPC." }] } }));
+  const done = textOf(
+    await client.callTool({
+      name: "answer_tailoring_questions",
+      arguments: { session_id: id, answers: [{ question_id: "q1", answer: "Terraform modules for our staging VPC." }] },
+    }),
+  );
   assert.match(done, /· ready/);
   assert.match(done, /add_bullet: "Wrote Terraform modules for the staging VPC\."/);
   assert.match(readFileSync(join(tmp, "facts.json"), "utf8"), /Terraform modules/, "the answer is remembered as a fact");

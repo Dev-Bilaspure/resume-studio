@@ -99,7 +99,9 @@ export function mergeFitEdits(edits: Edit[], fit: Edit[], original: ResumeDoc): 
       continue;
     }
     if (!originalBullets.has(c.target)) continue;
-    const existing = out.find((e) => e.change.target === c.target && (e.change.op === "rewrite_bullet" || e.change.op === "remove_bullet") && e.status !== "dropped");
+    const existing = out.find(
+      (e) => e.change.target === c.target && (e.change.op === "rewrite_bullet" || e.change.op === "remove_bullet") && e.status !== "dropped",
+    );
     const tagged: Edit = { ...f, reason: `${f.reason} (to fit the page budget)`, status: f.status ?? "ok" };
     if (!existing) out.push(tagged);
     else if (c.op === "remove_bullet") Object.assign(existing, tagged, { id: existing.id });

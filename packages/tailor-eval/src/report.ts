@@ -92,7 +92,9 @@ export function markdownReport(results: CaseResult[], meta: { engine: string; ju
     `| Must-haves the recruiter saw (mean) | ${fix(s.meanShownBefore)} → ${fix(s.meanShownAfter)} |`,
     `| Truthfulness: no high/medium issue | ${s.audit.clean} of ${s.audit.audited} (${pct(s.audit.clean, s.audit.audited)}) |`,
     `| Truthfulness issues (high / medium / low) | ${s.audit.high} / ${s.audit.medium} / ${s.audit.low} |`,
-    ...(s.questionsAsked ? [`| Gap questions: asked / answered from the candidate's history / facts learned | ${s.questionsAsked} / ${s.questionsAnswered} / ${s.factsLearned} |`] : []),
+    ...(s.questionsAsked
+      ? [`| Gap questions: asked / answered from the candidate's history / facts learned | ${s.questionsAsked} / ${s.questionsAnswered} / ${s.factsLearned} |`]
+      : []),
     `| Page count kept | ${s.pagesKept} of ${s.ready} |`,
     `| Mean time / model calls per case | ${fix(s.meanSeconds, 0)} s / ${fix(s.meanCalls)} |`,
     ``,
@@ -114,16 +116,27 @@ export function markdownReport(results: CaseResult[], meta: { engine: string; ju
   const flips = results.filter((r) => r.screen && r.screen.original.advance !== r.screen.tailored.advance);
   if (flips.length) {
     lines.push(``, `## Decisions that changed`, ``);
-    for (const r of flips) lines.push(`- **${r.id}** (${r.screen!.tailored.advance ? "gained" : "lost"}): original: ${r.screen!.original.reason} Tailored: ${r.screen!.tailored.reason}`);
+    for (const r of flips)
+      lines.push(
+        `- **${r.id}** (${r.screen!.tailored.advance ? "gained" : "lost"}): original: ${r.screen!.original.reason} Tailored: ${r.screen!.tailored.reason}`,
+      );
   }
   // Does the engine's fit call (made before any rewriting) predict the recruiter's decision?
   const called = results.filter((r) => r.fit && r.screen);
   if (called.length) {
-    lines.push(``, `## The engine's fit call vs the recruiter`, ``, `| Fit (before tailoring) | Cases | Original advanced | Tailored advanced |`, `|---|---|---|---|`);
+    lines.push(
+      ``,
+      `## The engine's fit call vs the recruiter`,
+      ``,
+      `| Fit (before tailoring) | Cases | Original advanced | Tailored advanced |`,
+      `|---|---|---|---|`,
+    );
     for (const level of ["strong", "stretch", "long-shot"] as const) {
       const rs = called.filter((r) => r.fit!.level === level);
       if (!rs.length) continue;
-      lines.push(`| ${level} | ${rs.length} | ${rs.filter((r) => r.screen!.original.advance).length} | ${rs.filter((r) => r.screen!.tailored.advance).length} |`);
+      lines.push(
+        `| ${level} | ${rs.length} | ${rs.filter((r) => r.screen!.original.advance).length} | ${rs.filter((r) => r.screen!.tailored.advance).length} |`,
+      );
     }
   }
   const asked = results.filter((r) => r.questions?.length);

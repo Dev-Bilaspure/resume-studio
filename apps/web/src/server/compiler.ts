@@ -100,10 +100,10 @@ export async function compileDir(opts: CompileOptions): Promise<RawCompile> {
   const diagnostics = [
     ...res.notes,
     ...attributeToUsepackage(
-    [
-      ...parseLog(log, { rootDir: opts.outDir, cwd: mainDir }),
-      ...parseBibLog(await readFile(out("blg"), "utf8").catch(() => ""), { rootDir: opts.outDir, cwd: mainDir }),
-    ],
+      [
+        ...parseLog(log, { rootDir: opts.outDir, cwd: mainDir }),
+        ...parseBibLog(await readFile(out("blg"), "utf8").catch(() => ""), { rootDir: opts.outDir, cwd: mainDir }),
+      ],
       await readSourcesIn(opts.srcDir, opts.mainFile),
     ),
   ];
@@ -155,7 +155,8 @@ export async function compileDir(opts: CompileOptions): Promise<RawCompile> {
 async function latexmkHere(opts: CompileOptions, cwd: string): Promise<LatexmkRun> {
   const latexmk = findTool("latexmk");
   if (!latexmk) {
-    const fail = "TeX isn't installed (latexmk not found). Start the compile service with `docker compose up -d` (or install MacTeX: brew install --cask mactex-no-gui), then recompile.";
+    const fail =
+      "TeX isn't installed (latexmk not found). Start the compile service with `docker compose up -d` (or install MacTeX: brew install --cask mactex-no-gui), then recompile.";
     return { code: null, stdout: "", stderr: "", timedOut: false, startFailed: fail, notes: [] };
   }
   await mkdir(opts.outDir, { recursive: true });
@@ -168,7 +169,9 @@ async function latexmkHere(opts: CompileOptions, cwd: string): Promise<LatexmkRu
     trusted: opts.trusted,
     haltOnError: opts.haltOnError,
     builtinRc: BUILTIN_RC,
-    projectRcs: PROJECT_RC_FILES.filter((f) => existsSync(join(/*turbopackIgnore: true*/ opts.srcDir, f))).map((f) => join(/*turbopackIgnore: true*/ opts.outDir, f)),
+    projectRcs: PROJECT_RC_FILES.filter((f) => existsSync(join(/*turbopackIgnore: true*/ opts.srcDir, f))).map((f) =>
+      join(/*turbopackIgnore: true*/ opts.outDir, f),
+    ),
   });
   const res = await run(latexmk, args, { cwd, timeoutMs: COMPILE_TIMEOUT_MS, env });
   if (res.error) return { code: null, stdout: "", stderr: "", timedOut: false, startFailed: `Couldn't run latexmk: ${res.error.message}`, notes: [] };

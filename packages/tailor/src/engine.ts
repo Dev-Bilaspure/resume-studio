@@ -22,7 +22,22 @@ import {
 } from "./prompts.ts";
 import { assessFit } from "./fit.ts";
 import { coverage, uid } from "./text.ts";
-import type { Answer, BuildCheck, DropReason, Edit, Fact, JobInput, JobProfile, Question, Report, Session, SessionStatus, SourceFiles, TailorEvent, TailorOptions } from "./types.ts";
+import type {
+  Answer,
+  BuildCheck,
+  DropReason,
+  Edit,
+  Fact,
+  JobInput,
+  JobProfile,
+  Question,
+  Report,
+  Session,
+  SessionStatus,
+  SourceFiles,
+  TailorEvent,
+  TailorOptions,
+} from "./types.ts";
 import { beforeText, checkEdits, entryHeading, evidenceText, indexDoc, toEdit } from "./verify.ts";
 
 export const ENGINE_VERSION = "0.1.0";
@@ -103,7 +118,12 @@ export function createTailorEngine(deps: EngineDeps) {
   async function analyze(s: Session, signal?: AbortSignal) {
     // No company or title given (a pasted posting): take them, and the level and location, from the posting.
     if ((!s.job.company || !s.job.role) && !s.context._postingRead) {
-      const d = await call(s, "read-posting", { ...postingPrompt(s.job.description), schema: PostingSchema, schemaName: "posting_details", maxOutputTokens: 1_000 }, signal);
+      const d = await call(
+        s,
+        "read-posting",
+        { ...postingPrompt(s.job.description), schema: PostingSchema, schemaName: "posting_details", maxOutputTokens: 1_000 },
+        signal,
+      );
       s.job = {
         ...s.job,
         company: s.job.company || d.company?.trim() || "",
@@ -122,7 +142,12 @@ export function createTailorEngine(deps: EngineDeps) {
       const key = canonical(term).toLowerCase();
       const prev = keywords.get(key);
       const aliases = [...new Set([...(prev?.aliases ?? []), ...k.aliases, ...variants(term)].filter((a) => a && a.toLowerCase() !== term.toLowerCase()))];
-      keywords.set(key, { term, aliases, importance: prev?.importance === "must" || k.importance === "must" ? "must" : "nice", kind: prev?.kind === "term" || k.kind === "term" ? "term" : "concept" });
+      keywords.set(key, {
+        term,
+        aliases,
+        importance: prev?.importance === "must" || k.importance === "must" ? "must" : "nice",
+        kind: prev?.kind === "term" || k.kind === "term" ? "term" : "concept",
+      });
     }
     s.profile = {
       roleFamily: out.roleFamily,
@@ -136,7 +161,12 @@ export function createTailorEngine(deps: EngineDeps) {
   }
 
   async function match(s: Session, signal?: AbortSignal) {
-    const out = await call(s, "match-evidence", { ...matchPrompt(s.doc!, s.facts, s.profile!, s.options), schema: MatchSchema, schemaName: "requirement_matches" }, signal);
+    const out = await call(
+      s,
+      "match-evidence",
+      { ...matchPrompt(s.doc!, s.facts, s.profile!, s.options), schema: MatchSchema, schemaName: "requirement_matches" },
+      signal,
+    );
     const ids = new Set(s.profile!.requirements.map((r) => r.id));
     const byReq = new Map(out.matches.filter((m) => ids.has(m.requirementId)).map((m) => [m.requirementId, m]));
     // Every requirement gets a verdict, even if the model skipped one.
@@ -158,7 +188,15 @@ export function createTailorEngine(deps: EngineDeps) {
       .filter((a) => a.none)
       .map((a) => s.questions?.find((q) => q.id === a.questionId))
       .filter((q): q is Question => !!q)
-      .map((q) => ({ id: uid("f"), kind: "lacks", topic: q.topic, text: `Hasn't done this: ${q.topic}. (Asked: "${q.question}")`, skills: [], source: "answer", createdAt: now }));
+      .map((q) => ({
+        id: uid("f"),
+        kind: "lacks",
+        topic: q.topic,
+        text: `Hasn't done this: ${q.topic}. (Asked: "${q.question}")`,
+        skills: [],
+        source: "answer",
+        createdAt: now,
+      }));
     if (declined.length) {
       s.facts = [...s.facts, ...declined];
       await deps.facts?.add(declined);
@@ -189,7 +227,15 @@ export function createTailorEngine(deps: EngineDeps) {
       s,
       "write-edits",
       {
-        ...editsPrompt({ doc: s.doc!, facts: s.facts, job: s.job, profile: s.profile!, matches: s.matches!, opts: s.options, currentPages: before?.pages ?? null }),
+        ...editsPrompt({
+          doc: s.doc!,
+          facts: s.facts,
+          job: s.job,
+          profile: s.profile!,
+          matches: s.matches!,
+          opts: s.options,
+          currentPages: before?.pages ?? null,
+        }),
         schema: EditsSchema,
         schemaName: "resume_edits",
         maxOutputTokens: 32_000,
@@ -209,9 +255,14 @@ export function createTailorEngine(deps: EngineDeps) {
     const first = checkEdits(edits, ix, s.profile!, s.options);
     // Structural problems (a duplicate or unknown target) can't be fixed by rewording: drop them.
     // Content problems (numbers, technologies, markup, the fact-check) get one repair round.
-    const structural = (issues: string[]) => issues.every((i) => /another edit already changes|unknown (bullet|entry|paragraph|skills line|headline)|isn't in entry|every bullet of the entry|isn't allowed/.test(i));
+    const structural = (issues: string[]) =>
+      issues.every((i) =>
+        /another edit already changes|unknown (bullet|entry|paragraph|skills line|headline)|isn't in entry|every bullet of the entry|isn't allowed/.test(i),
+      );
     type Failed = { edit: Edit; issues: string[]; by: "checks" | "fact-check" };
-    const dropped: Edit[] = first.failed.filter((f) => structural(f.issues)).map((f) => ({ ...f.edit, status: "dropped", issues: f.issues, dropReason: "checks" }));
+    const dropped: Edit[] = first.failed
+      .filter((f) => structural(f.issues))
+      .map((f) => ({ ...f.edit, status: "dropped", issues: f.issues, dropReason: "checks" }));
     let failed: Failed[] = first.failed.filter((f) => !structural(f.issues)).map((f) => ({ ...f, by: "checks" }));
     const judged = await judge(s, first.passed, ix, signal);
     const passed = judged.passed;
@@ -219,13 +270,23 @@ export function createTailorEngine(deps: EngineDeps) {
 
     if (failed.length) {
       event(s, { type: "step", step: "repair", message: `Fixing ${failed.length} edit${failed.length === 1 ? "" : "s"} that overstated the evidence` });
-      const out = await call(s, "repair", { ...repairPrompt({ doc: s.doc!, facts: s.facts, problems: failed }), schema: EditsSchema, schemaName: "resume_edits" }, signal);
+      const out = await call(
+        s,
+        "repair",
+        { ...repairPrompt({ doc: s.doc!, facts: s.facts, problems: failed }), schema: EditsSchema, schemaName: "resume_edits" },
+        signal,
+      );
       const { edits: fixed } = convert(out.edits, edits.length + 1);
       // A fix must be for a target that failed, and pass every check again.
       const byTarget = new Map(failed.map((f) => [f.edit.change.target, f]));
       const candidates = fixed.filter((e) => byTarget.has(e.change.target));
       const recheck = checkEdits([...passed, ...candidates], ix, s.profile!, s.options);
-      const rejudged = await judge(s, recheck.passed.filter((e) => candidates.some((c) => c.id === e.id)), ix, signal);
+      const rejudged = await judge(
+        s,
+        recheck.passed.filter((e) => candidates.some((c) => c.id === e.id)),
+        ix,
+        signal,
+      );
       for (const e of rejudged.passed) {
         const original = byTarget.get(e.change.target)!;
         byTarget.delete(e.change.target);
@@ -250,10 +311,9 @@ export function createTailorEngine(deps: EngineDeps) {
         before: beforeText(ix, e.change),
         after: "text" in e.change ? e.change.text : "",
         // A headline is judged against the whole experience: every role, plus what it cites.
-        evidence: [
-          ...(headline ? ix.headings.map((h) => `ROLE: ${h}`) : [entryHeading(ix, e.change)]),
-          ...e.evidence.map((r) => evidenceText(ix, r)),
-        ].filter((x): x is string => !!x),
+        evidence: [...(headline ? ix.headings.map((h) => `ROLE: ${h}`) : [entryHeading(ix, e.change)]), ...e.evidence.map((r) => evidenceText(ix, r))].filter(
+          (x): x is string => !!x,
+        ),
       };
     });
     const out = await call(s, "fact-check", { ...judgePrompt(items), schema: JudgeSchema, schemaName: "fact_check" }, signal);
@@ -312,11 +372,18 @@ export function createTailorEngine(deps: EngineDeps) {
     }
 
     for (let round = 0; check && maxPages && check.pages && check.pages > maxPages && round < MAX_FIT_ROUNDS; round++) {
-      const virtual = applyToDoc(s.doc!, edits.filter((e) => e.status !== "dropped"));
+      const virtual = applyToDoc(
+        s.doc!,
+        edits.filter((e) => e.status !== "dropped"),
+      );
       const out = await call(
         s,
         "fit-pages",
-        { ...fitPrompt({ doc: virtual, job: s.job, profile: s.profile!, overflowLines: check.overflowLines ?? 3, maxPages }), schema: EditsSchema, schemaName: "resume_edits" },
+        {
+          ...fitPrompt({ doc: virtual, job: s.job, profile: s.profile!, overflowLines: check.overflowLines ?? 3, maxPages }),
+          schema: EditsSchema,
+          schemaName: "resume_edits",
+        },
         signal,
       );
       const { edits: cuts } = convert(out.edits, edits.length + 1);
@@ -328,7 +395,10 @@ export function createTailorEngine(deps: EngineDeps) {
       check = await build(s, draft, maxPages, signal);
     }
     if (check && maxPages && check.pages && check.pages > maxPages) {
-      event(s, { type: "warning", message: `The draft is ${check.pages} pages, over the ${maxPages}-page budget. Reject a few additions in review to bring it back.` });
+      event(s, {
+        type: "warning",
+        message: `The draft is ${check.pages} pages, over the ${maxPages}-page budget. Reject a few additions in review to bring it back.`,
+      });
     }
     return { edits: order(edits), draft, check };
   }
@@ -348,7 +418,10 @@ export function createTailorEngine(deps: EngineDeps) {
     // Hard filters the resume can't change. Years/degree ones you already meet (a strong experience or
     // education requirement) aren't worth a warning.
     const met = (kind: string) =>
-      afterMatches.some((m) => m.status === "strong" && profile.requirements.find((r) => r.id === m.requirementId)?.category === (kind === "years" ? "experience" : "education"));
+      afterMatches.some(
+        (m) =>
+          m.status === "strong" && profile.requirements.find((r) => r.id === m.requirementId)?.category === (kind === "years" ? "experience" : "education"),
+      );
     for (const d of profile.dealBreakers) if (!((d.kind === "years" || d.kind === "degree") && met(d.kind))) warnings.push(`Check: ${d.text}`);
     const dropped = edits.filter((e) => e.status === "dropped");
     if (dropped.length) warnings.push(droppedSummary(dropped));
@@ -413,7 +486,12 @@ export function createTailorEngine(deps: EngineDeps) {
         }
         if (!s.fit) s.fit = assessFit(s.profile!, s.matches!);
         if (s.questions?.length && !s.answers) {
-          s.report = { before: { ...coverage(beforeCheck?.text ?? docText(s.doc), s.profile!.keywords, s.matches!), build: beforeCheck }, after: { ...coverage("", [], []) }, strategy: "", warnings: [] };
+          s.report = {
+            before: { ...coverage(beforeCheck?.text ?? docText(s.doc), s.profile!.keywords, s.matches!), build: beforeCheck },
+            after: { ...coverage("", [], []) },
+            strategy: "",
+            warnings: [],
+          };
           await save(s, "needs_input");
           return s;
         }
@@ -491,7 +569,11 @@ export function createTailorEngine(deps: EngineDeps) {
         s.selection = selection;
         await store.put(s);
       }
-      return deps.adapter.apply(s.source, s.doc, s.edits.filter((e) => selection.includes(e.id)));
+      return deps.adapter.apply(
+        s.source,
+        s.doc,
+        s.edits.filter((e) => selection.includes(e.id)),
+      );
     },
   };
 }

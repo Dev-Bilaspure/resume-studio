@@ -17,4 +17,6 @@ const walk = (d: string) => {
 walk(dir);
 const p = parseLatex({ main, files });
 console.log(renderDoc(p.doc));
-console.log(`\n-- ${p.lists.size} lists, ${p.bullets.size} bullets, ${p.skills.size} skills lines, ${p.paragraphs.size} paragraphs, headline: ${p.doc.headline?.text ?? "none"}`);
+console.log(
+  `\n-- ${p.lists.size} lists, ${p.bullets.size} bullets, ${p.skills.size} skills lines, ${p.paragraphs.size} paragraphs, headline: ${p.doc.headline?.text ?? "none"}`,
+);

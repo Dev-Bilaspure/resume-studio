@@ -24,7 +24,7 @@ const env = () => ({ ...process.env, PATH: [...(process.env.PATH ?? "").split(de
 function run(cmd: string, args: string[], opts: { cwd?: string; timeoutMs: number; signal?: AbortSignal }) {
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     execFile(cmd, args, { cwd: opts.cwd, env: env(), timeout: opts.timeoutMs, signal: opts.signal, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
-      const code = err ? (typeof (err as { code?: unknown }).code === "number" ? ((err as { code: number }).code) : 1) : 0;
+      const code = err ? (typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : 1) : 0;
       resolve({ code, stdout: String(stdout), stderr: String(stderr) });
     });
   });
@@ -70,7 +70,12 @@ export function latexmkVerifier(options: LatexmkOptions = {}): BuildVerifier {
         write(files);
         const base = source.main.replace(/\.[^.]+$/, "");
         const pdf = join(work, `${base}.pdf`);
-        const compile = () => run("latexmk", [latexEngine(source), "-interaction=nonstopmode", "-file-line-error", "-halt-on-error", "-norc", "-g", source.main], { cwd: work, timeoutMs, signal });
+        const compile = () =>
+          run("latexmk", [latexEngine(source), "-interaction=nonstopmode", "-file-line-error", "-halt-on-error", "-norc", "-g", source.main], {
+            cwd: work,
+            timeoutMs,
+            signal,
+          });
         let tex = await compile();
         // A font the document names isn't installed here (Arial on Linux): check the layout with its
         // metric-compatible stand-in instead. Only this build's copy changes; the source stays as written.
@@ -88,8 +93,16 @@ export function latexmkVerifier(options: LatexmkOptions = {}): BuildVerifier {
         }
         if (tex.code !== 0 || !existsSync(pdf)) {
           const log = existsSync(join(work, `${base}.log`)) ? readFileSync(join(work, `${base}.log`), "utf8") : "";
-          const errors = [...log.matchAll(/^(?:\.\/)?([^:\n]+\.(?:tex|cls|sty)):(\d+): (.*)$/gm)].map((m) => ({ file: m[1], line: Number(m[2]), message: m[3] }));
-          return { ok: false, pages: null, errors: errors.length ? errors : [{ message: (tex.stderr || tex.stdout).trim().split("\n").slice(-3).join(" ") || "The draft didn't compile" }] };
+          const errors = [...log.matchAll(/^(?:\.\/)?([^:\n]+\.(?:tex|cls|sty)):(\d+): (.*)$/gm)].map((m) => ({
+            file: m[1],
+            line: Number(m[2]),
+            message: m[3],
+          }));
+          return {
+            ok: false,
+            pages: null,
+            errors: errors.length ? errors : [{ message: (tex.stderr || tex.stdout).trim().split("\n").slice(-3).join(" ") || "The draft didn't compile" }],
+          };
         }
         const info = await run("pdfinfo", [pdf], { timeoutMs: 15_000 });
         const pages = Number(/Pages:\s+(\d+)/.exec(info.stdout)?.[1]) || null;
@@ -133,10 +146,22 @@ export function texServiceVerifier(options: TexServiceVerifierOptions): BuildVer
       const include = (p: string, n: string) => !n.startsWith(".") && n !== "node_modules" && !(p in source.files) && !BUILD_OUTPUT.test(n);
       const assets = options.assetsDir && existsSync(options.assetsDir) ? await folderEntries(options.assetsDir, include) : [];
       await service.sync(project, [...assets, ...memoryEntries(source.files)], signal);
-      const r = await service.compile(project, { main: source.main, engine: ENGINE_OF[latexEngine(source)], force: true, haltOnError: true, timeoutMs }, signal);
+      const r = await service.compile(
+        project,
+        { main: source.main, engine: ENGINE_OF[latexEngine(source)], force: true, haltOnError: true, timeoutMs },
+        signal,
+      );
       if (r.code !== 0 || !r.pdf) {
-        const errors = [...(r.log ?? "").matchAll(/^(?:\.\/)?([^:\n]+\.(?:tex|cls|sty)):(\d+): (.*)$/gm)].map((m) => ({ file: m[1], line: Number(m[2]), message: m[3] }));
-        return { ok: false, pages: null, errors: errors.length ? errors : [{ message: (r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ") || "The draft didn't compile" }] };
+        const errors = [...(r.log ?? "").matchAll(/^(?:\.\/)?([^:\n]+\.(?:tex|cls|sty)):(\d+): (.*)$/gm)].map((m) => ({
+          file: m[1],
+          line: Number(m[2]),
+          message: m[3],
+        }));
+        return {
+          ok: false,
+          pages: null,
+          errors: errors.length ? errors : [{ message: (r.stderr || r.stdout).trim().split("\n").slice(-3).join(" ") || "The draft didn't compile" }],
+        };
       }
       const pdf = Buffer.from(r.pdf, "base64");
       const { text, info } = await service.inspectPdf(pdf, { text: true, info: true });

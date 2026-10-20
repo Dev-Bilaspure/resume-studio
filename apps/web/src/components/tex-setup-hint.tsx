@@ -16,8 +16,8 @@ export function TexSetupHint({ system }: { system: SystemStatus }) {
   }
   return (
     <>
-      TeX isn&apos;t installed, so nothing can compile. Either run the compile service (<Cmd>docker compose up -d</Cmd>, no other setup), or install MacTeX
-      (<Cmd>brew install --cask mactex-no-gui</Cmd>, the full TeX Live, the same as Overleaf).
+      TeX isn&apos;t installed, so nothing can compile. Either run the compile service (<Cmd>docker compose up -d</Cmd>, no other setup), or install MacTeX (
+      <Cmd>brew install --cask mactex-no-gui</Cmd>, the full TeX Live, the same as Overleaf).
     </>
   );
 }

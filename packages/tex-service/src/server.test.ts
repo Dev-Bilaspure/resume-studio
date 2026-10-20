@@ -85,7 +85,10 @@ test("a token, when set, is required", async () => {
 });
 
 test("paths, ids and hashes are checked", async () => {
-  await assert.rejects(client.sync("p-bad", memoryEntries({ "../escape.tex": "x" })), (e: TexServiceError) => e.status === 400 && /Invalid file path/.test(e.message));
+  await assert.rejects(
+    client.sync("p-bad", memoryEntries({ "../escape.tex": "x" })),
+    (e: TexServiceError) => e.status === 400 && /Invalid file path/.test(e.message),
+  );
   await assert.rejects(client.sync("p-bad", memoryEntries({ "/etc/passwd": "x" })), (e: TexServiceError) => e.status === 400);
   await assert.rejects(client.compile("..", { main: "main.tex", engine: "pdflatex" }), (e: TexServiceError) => e.status === 400 || e.status === 404);
   const wrong = await fetch(`${base}/v1/projects/p-bad/files`, {
@@ -108,7 +111,10 @@ test("an unreachable service is explained", async () => {
 
 test("sync uploads only what changed and deletes what's gone", async () => {
   const urls: string[] = [];
-  const counting = createTexServiceClient({ url: base, fetch: (input, init) => (urls.push(`${init?.method} ${String(input).replace(base, "")}`), fetch(input, init)) });
+  const counting = createTexServiceClient({
+    url: base,
+    fetch: (input, init) => (urls.push(`${init?.method} ${String(input).replace(base, "")}`), fetch(input, init)),
+  });
   await counting.sync("p-sync", memoryEntries({ "main.tex": "a", "sub/part.tex": "b" }));
   assert.ok(existsSync(join(dataDir, "projects/p-sync/sub/part.tex")));
   urls.length = 0;
@@ -173,7 +179,10 @@ test("a broken document reports its errors and no PDF", needsTex, async () => {
 });
 
 test("a main file in a subfolder builds in its folder", needsTex, async () => {
-  await client.sync("p-nested", memoryEntries({ "cv/main.tex": "\\documentclass{article}\n\\begin{document}\n\\input{part}\n\\end{document}\n", "cv/part.tex": "Hello." }));
+  await client.sync(
+    "p-nested",
+    memoryEntries({ "cv/main.tex": "\\documentclass{article}\n\\begin{document}\n\\input{part}\n\\end{document}\n", "cv/part.tex": "Hello." }),
+  );
   const r = await client.compile("p-nested", { main: "cv/main.tex", engine: "pdflatex" });
   assert.equal(r.code, 0, r.stdout);
   assert.ok(r.pdf);

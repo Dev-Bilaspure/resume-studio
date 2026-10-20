@@ -16,6 +16,7 @@ export const syncApi = {
   connect: (url: string) => req<SyncStatus>("/api/sync/connect", { method: "POST", body: JSON.stringify({ url }) }),
   disconnect: () => req<SyncStatus>("/api/sync", { method: "DELETE" }),
   upload: () => req<SyncStatus>("/api/sync/upload", { method: "POST" }),
-  download: (resolutions: Record<string, "local" | "remote">) => req<SyncStatus>("/api/sync/download", { method: "POST", body: JSON.stringify({ resolutions }) }),
+  download: (resolutions: Record<string, "local" | "remote">) =>
+    req<SyncStatus>("/api/sync/download", { method: "POST", body: JSON.stringify({ resolutions }) }),
   diff: (path: string, side: "local" | "remote" | "conflict") => req<SyncDiff>(`/api/sync/diff?path=${encodeURIComponent(path)}&side=${side}`),
 };

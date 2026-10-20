@@ -11,16 +11,47 @@ test("front matter: fields and the posting's text", () => {
   assert.equal(jobInput({ id: "x", company: "Acme", role: "R", level: "new-grad", description: "d" }).seniority, "junior");
 });
 
-const screen = (advance: boolean, fit: number, shown: number) => ({ advance, fit, shown: Array.from({ length: shown }, (_, i) => `m${i}`), missing: [], reason: "r" });
+const screen = (advance: boolean, fit: number, shown: number) => ({
+  advance,
+  fit,
+  shown: Array.from({ length: shown }, (_, i) => `m${i}`),
+  missing: [],
+  reason: "r",
+});
 
-function result(id: string, original: ReturnType<typeof screen>, tailored: ReturnType<typeof screen>, issues: { severity: "high" | "medium" | "low" }[] = []): CaseResult {
+function result(
+  id: string,
+  original: ReturnType<typeof screen>,
+  tailored: ReturnType<typeof screen>,
+  issues: { severity: "high" | "medium" | "low" }[] = [],
+): CaseResult {
   return {
     id,
     resume: "r",
     jd: id,
     posting: { company: "C", role: "R" },
     status: "ready",
-    engine: { provider: "p", model: "m", seconds: 100, calls: 6, inputTokens: 0, outputTokens: 0, edits: 5, dropped: 1, flagged: 0, pagesBefore: 1, pagesAfter: 1, atsBefore: null, atsAfter: null, keywordsBefore: 3, keywordsAfter: 5, keywordsTotal: 8, strongBefore: 4, strongAfter: 6, requirements: 10 },
+    engine: {
+      provider: "p",
+      model: "m",
+      seconds: 100,
+      calls: 6,
+      inputTokens: 0,
+      outputTokens: 0,
+      edits: 5,
+      dropped: 1,
+      flagged: 0,
+      pagesBefore: 1,
+      pagesAfter: 1,
+      atsBefore: null,
+      atsAfter: null,
+      keywordsBefore: 3,
+      keywordsAfter: 5,
+      keywordsTotal: 8,
+      strongBefore: 4,
+      strongAfter: 6,
+      requirements: 10,
+    },
     audit: { issues: issues.map((i) => ({ kind: "invented_skill" as const, severity: i.severity, quote: "q", why: "w" })) },
     screen: { original, tailored },
     judge: { provider: "p", model: "j" },

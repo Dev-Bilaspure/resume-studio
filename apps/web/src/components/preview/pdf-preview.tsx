@@ -11,7 +11,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { DOCUMENT_OPTIONS, loadPdfjs } from "./pdfjs";
 
-
 type ViewerLib = typeof import("pdfjs-dist/legacy/web/pdf_viewer.mjs");
 type Viewer = InstanceType<ViewerLib["PDFViewer"]>;
 type EventBus = InstanceType<ViewerLib["EventBus"]>;
@@ -515,7 +514,10 @@ export const PdfPreview = forwardRef<PdfPreviewHandle, Props>(function PdfPrevie
               <FindToggle className="size-6" label="Match whole word" keys={`${ALT_KEY}W`} on={opts.entireWord} onClick={() => toggleOpt("entireWord")}>
                 <WholeWord />
               </FindToggle>
-              <span className={cn("w-16 text-center text-[11px] tabular-nums", query && !matches.total ? "text-destructive" : "text-muted-foreground")} aria-live="polite">
+              <span
+                className={cn("w-16 text-center text-[11px] tabular-nums", query && !matches.total ? "text-destructive" : "text-muted-foreground")}
+                aria-live="polite"
+              >
                 {query ? (matches.total ? `${matches.current} of ${matches.total}` : "No results") : ""}
               </span>
               <Button type="button" variant="ghost" size="icon-xs" aria-label="Previous match" onClick={() => find("again", true)}>
@@ -524,13 +526,7 @@ export const PdfPreview = forwardRef<PdfPreviewHandle, Props>(function PdfPrevie
               <Button type="submit" variant="ghost" size="icon-xs" aria-label="Next match">
                 <ChevronDown />
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Close search"
-                onClick={closeFind}
-              >
+              <Button type="button" variant="ghost" size="icon-xs" aria-label="Close search" onClick={closeFind}>
                 <X />
               </Button>
             </form>

@@ -7,7 +7,11 @@ import { llmFor } from "@/server/tailor";
 export const POST = handler(async (req: Request) => {
   const input = await body(
     req,
-    z.object({ description: z.string().trim().min(80).max(60_000), provider: z.enum(["claude-code", "openai", "anthropic", "vertex"]).optional(), model: z.string().max(200).optional() }),
+    z.object({
+      description: z.string().trim().min(80).max(60_000),
+      provider: z.enum(["claude-code", "openai", "anthropic", "vertex"]).optional(),
+      model: z.string().max(200).optional(),
+    }),
   );
   const details: PostingDetails = await readPosting(await llmFor(input.provider, input.model), input.description, req.signal);
   return Response.json(details);

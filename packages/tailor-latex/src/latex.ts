@@ -1,4 +1,13 @@
-import { EditApplyError, type Edit, type EditOp, type FormatAdapter, type ResumeDoc, type Section, type SectionKind, type SourceFiles } from "@resume-studio/tailor";
+import {
+  EditApplyError,
+  type Edit,
+  type EditOp,
+  type FormatAdapter,
+  type ResumeDoc,
+  type Section,
+  type SectionKind,
+  type SourceFiles,
+} from "@resume-studio/tailor";
 import { latexToMarkup, latexToPlain, markupToLatex } from "./convert.ts";
 import { combine, lineAt, maskComments, matchGroup, readArgs, toFileRange, type Combined } from "./scan.ts";
 
@@ -491,7 +500,10 @@ function rebuildList(T: string, list: ListSpan, edits: Pick<Edit, "id" | "change
           rebuilt.push(id);
           for (let i = sequence.indexOf(id) + 1; i < sequence.length && !rank.has(sequence[i]); i++) rebuilt.push(sequence[i]);
         }
-        const leading = sequence.slice(0, sequence.findIndex((id) => rank.has(id)));
+        const leading = sequence.slice(
+          0,
+          sequence.findIndex((id) => rank.has(id)),
+        );
         sequence = [...leading, ...rebuilt];
         break;
       }

@@ -73,7 +73,9 @@ async function secretSet(provider: ProviderId, key: FieldKey, value: string) {
   }
   // -U updates an existing item. `security` takes the secret as an argument (it's briefly visible to
   // your own user's process list while the command runs, never to other users), and never on disk.
-  const r = await run("/usr/bin/security", ["add-generic-password", "-U", "-s", KEYCHAIN_SERVICE, "-a", account(provider, key), "-w", value], { timeoutMs: 10_000 });
+  const r = await run("/usr/bin/security", ["add-generic-password", "-U", "-s", KEYCHAIN_SERVICE, "-a", account(provider, key), "-w", value], {
+    timeoutMs: 10_000,
+  });
   if (r.code !== 0) throw new HttpError(500, `Couldn't save to the Keychain: ${r.stderr.trim()}`);
 }
 
@@ -197,6 +199,9 @@ export async function resolveProvider(id?: ProviderId, overrides?: { model?: str
     organization: await value("organization"),
     openaiProject: await value("openaiProject"),
     claudeCodePath: await value("claudeCodePath"),
-    vertex: vertexProject || vertexLocation ? { project: vertexProject ?? "", location: vertexLocation ?? "", credentialsJson: await value("vertexCredentialsJson") } : undefined,
+    vertex:
+      vertexProject || vertexLocation
+        ? { project: vertexProject ?? "", location: vertexLocation ?? "", credentialsJson: await value("vertexCredentialsJson") }
+        : undefined,
   };
 }

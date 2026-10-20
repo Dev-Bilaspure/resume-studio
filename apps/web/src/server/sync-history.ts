@@ -40,7 +40,19 @@ const LABEL = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[a-z0-9][a-z0-9-]*$/;
 function snapGit(args: string[]) {
   return run(
     "git",
-    ["--git-dir", SNAPSHOT_GIT_DIR, "--work-tree", RESUMES_DIR, "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", "-c", "core.autocrlf=false", ...args],
+    [
+      "--git-dir",
+      SNAPSHOT_GIT_DIR,
+      "--work-tree",
+      RESUMES_DIR,
+      "-c",
+      "core.hooksPath=/dev/null",
+      "-c",
+      "commit.gpgsign=false",
+      "-c",
+      "core.autocrlf=false",
+      ...args,
+    ],
     { cwd: RESUMES_DIR, timeoutMs: 120_000, env: { GIT_TERMINAL_PROMPT: "0", GIT_CONFIG_NOSYSTEM: "1" } },
   );
 }
@@ -158,7 +170,10 @@ export async function downloadHistory(git: Git, syncGitDir: string): Promise<{ s
   await ensureSnapshotRepo();
 
   // Bring the repository's commits (and what its labels point at) over, under temporary names.
-  await ok(snapGit(["fetch", "-q", "--no-tags", syncGitDir, ...(remote ? [`+${REMOTE_BRANCH}:refs/sync/incoming`] : []), `+${REMOTE_LABELS}*:refs/sync/labels/*`]), "copying the snapshot history");
+  await ok(
+    snapGit(["fetch", "-q", "--no-tags", syncGitDir, ...(remote ? [`+${REMOTE_BRANCH}:refs/sync/incoming`] : []), `+${REMOTE_LABELS}*:refs/sync/labels/*`]),
+    "copying the snapshot history",
+  );
   try {
     if (remote) await joinBranch(remote);
     // Labels: three-way, against what both had at the last sync.
@@ -185,7 +200,8 @@ export async function downloadHistory(git: Git, syncGitDir: string): Promise<{ s
     await importLocalHistory(git);
     return { snapshots: status.remoteSnapshots, labels: changed, keptHere };
   } finally {
-    for (const ref of (await ok(snapGit(["for-each-ref", "--format=%(refname)", "refs/sync/"]), "listing")).split("\n").filter(Boolean)) await snapGit(["update-ref", "-d", ref]);
+    for (const ref of (await ok(snapGit(["for-each-ref", "--format=%(refname)", "refs/sync/"]), "listing")).split("\n").filter(Boolean))
+      await snapGit(["update-ref", "-d", ref]);
   }
 }
 
@@ -205,7 +221,19 @@ async function joinBranch(remote: string) {
       // are both histories. It isn't a snapshot itself (listings skip merges).
       const tree = (await ok(snapGit(["rev-parse", `${here}^{tree}`]), "reading the history")).trim();
       next = (
-        await ok(snapGit(["commit-tree", tree, "-p", here, "-p", remote, "-m", `Joined the snapshot history of ${hostname().replace(/\.local$/, "")} and the repository`]), "joining histories")
+        await ok(
+          snapGit([
+            "commit-tree",
+            tree,
+            "-p",
+            here,
+            "-p",
+            remote,
+            "-m",
+            `Joined the snapshot history of ${hostname().replace(/\.local$/, "")} and the repository`,
+          ]),
+          "joining histories",
+        )
       ).trim();
     }
     const moved = await snapGit(["update-ref", "refs/heads/snapshots", next, ...(here ? [here] : ["0000000000000000000000000000000000000000"])]);

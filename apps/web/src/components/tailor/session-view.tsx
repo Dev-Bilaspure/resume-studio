@@ -272,7 +272,11 @@ function Questions({ session, onDone }: { session: Session; onDone(): void }) {
           ? []
           : // A blank answer is skipped, not "haven't done this": that one is remembered for good.
             questions.flatMap((q): Answer[] =>
-              answers[q.id].none ? [{ questionId: q.id, none: true }] : answers[q.id].text.trim() ? [{ questionId: q.id, text: answers[q.id].text.trim() }] : [],
+              answers[q.id].none
+                ? [{ questionId: q.id, none: true }]
+                : answers[q.id].text.trim()
+                  ? [{ questionId: q.id, text: answers[q.id].text.trim() }]
+                  : [],
             ),
       );
       onDone();
@@ -291,8 +295,8 @@ function Questions({ session, onDone }: { session: Session; onDone(): void }) {
         <h2 className="text-lg font-semibold">A few requirements aren&apos;t clearly shown on your resume yet</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           If you&apos;ve done any of these, say where and what, briefly. Answers are only used as written, and are saved to your profile so you won&apos;t be
-          asked again. If you haven&apos;t, tick &quot;I haven&apos;t done this&quot;: nothing will be claimed, and it won&apos;t be asked again. Leave one blank to
-          skip it for now.
+          asked again. If you haven&apos;t, tick &quot;I haven&apos;t done this&quot;: nothing will be claimed, and it won&apos;t be asked again. Leave one
+          blank to skip it for now.
         </p>
         <ol className="mt-6 space-y-4">
           {questions.map((q, i) => {

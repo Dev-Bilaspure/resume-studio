@@ -4,7 +4,8 @@ import { APICallError, RetryError } from "ai";
 import { toLLMError } from "./providers.ts";
 import { LLMError } from "./types.ts";
 
-const apiError = (message: string, statusCode: number) => new APICallError({ message, url: "https://example.test", requestBodyValues: {}, statusCode, isRetryable: true });
+const apiError = (message: string, statusCode: number) =>
+  new APICallError({ message, url: "https://example.test", requestBodyValues: {}, statusCode, isRetryable: true });
 
 test("a Claude subscription limit is a rate limit, with the reset time, and isn't retried", () => {
   const e = toLLMError(apiError("You've hit your session limit · resets 2:40am (Asia/Calcutta)", 429), "claude-code");

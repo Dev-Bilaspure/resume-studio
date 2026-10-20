@@ -140,7 +140,13 @@ export async function systemStatus(): Promise<SystemStatus> {
       const engines = Object.fromEntries(TEX_ENGINES.map((e) => [e, info.tex.engines[e] ? e : null])) as Record<Engine, string | null>;
       value = {
         compiler: { mode: "service", url, error: null },
-        tex: { available: info.tex.latexmk && info.tex.engines.pdflatex, latexmk: info.tex.latexmk ? "latexmk" : null, engines, synctex: info.tex.synctex ? "synctex" : null, version: info.tex.version },
+        tex: {
+          available: info.tex.latexmk && info.tex.engines.pdflatex,
+          latexmk: info.tex.latexmk ? "latexmk" : null,
+          engines,
+          synctex: info.tex.synctex ? "synctex" : null,
+          version: info.tex.version,
+        },
         ats: { available: info.poppler.missing.length === 0, missing: info.poppler.missing },
         git,
         root: ROOT,

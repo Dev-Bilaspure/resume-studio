@@ -1,7 +1,15 @@
 import "server-only";
 import { readFile, rm } from "node:fs/promises";
 import { relative } from "node:path";
-import { createTexServiceClient, DEFAULT_PORT, sha256, type InfoResponse, type InspectOptions, type InspectResponse, type TexServiceClient } from "@resume-studio/tex-service";
+import {
+  createTexServiceClient,
+  DEFAULT_PORT,
+  sha256,
+  type InfoResponse,
+  type InspectOptions,
+  type InspectResponse,
+  type TexServiceClient,
+} from "@resume-studio/tex-service";
 import { STATE_DIR, findTool } from "./config";
 import { run } from "./run";
 
@@ -54,14 +62,21 @@ export async function serviceInfo(): Promise<InfoResponse | Error> {
  */
 export function serviceProject(outDir: string): string {
   const rel = relative(STATE_DIR, outDir) || "root";
-  const readable = rel.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^[^A-Za-z0-9]+/, "").slice(0, 96) || "p";
+  const readable =
+    rel
+      .replace(/[^A-Za-z0-9._-]+/g, "_")
+      .replace(/^[^A-Za-z0-9]+/, "")
+      .slice(0, 96) || "p";
   return `${readable}-${sha256(outDir).slice(0, 8)}`;
 }
 
 /** Deletes a build folder, and its project on the compile service. */
 export async function releaseBuildDir(outDir: string) {
   await rm(outDir, { recursive: true, force: true });
-  if (toolchainMode() === "service") await texService().deleteProject(serviceProject(outDir)).catch(() => {});
+  if (toolchainMode() === "service")
+    await texService()
+      .deleteProject(serviceProject(outDir))
+      .catch(() => {});
 }
 
 // ---- PDF tools (poppler) ----------------------------------------------------------------------------------

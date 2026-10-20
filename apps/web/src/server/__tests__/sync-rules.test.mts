@@ -3,7 +3,16 @@ import { test } from "node:test";
 import { findSecret, isSynced } from "../sync-rules.ts";
 
 test("only data is synced: resumes, facts, sessions, AI choices", () => {
-  for (const p of ["resumes/first-resume/main.tex", "resumes/first-resume/photo.png", "resumes/_profile/facts.json", "resumes/acme/jd.md", ".resume-studio/tailor/sessions/ts-mvefagb7-7fdh.json", ".resume-studio/ai.json", ".resume-studio/preferences.json", ".resume-studio/trash/old-cv-2026-10-17T11-44-00-000Z/main.tex"])
+  for (const p of [
+    "resumes/first-resume/main.tex",
+    "resumes/first-resume/photo.png",
+    "resumes/_profile/facts.json",
+    "resumes/acme/jd.md",
+    ".resume-studio/tailor/sessions/ts-mvefagb7-7fdh.json",
+    ".resume-studio/ai.json",
+    ".resume-studio/preferences.json",
+    ".resume-studio/trash/old-cv-2026-10-17T11-44-00-000Z/main.tex",
+  ])
     assert.equal(isSynced(p), true, p);
 });
 
@@ -41,5 +50,6 @@ test("secrets are recognized; ordinary resume text isn't", () => {
   assert.equal(findSecret("AIza" + "C".repeat(35)), "a Google API key");
   assert.equal(findSecret("-----BEGIN RSA PRIVATE KEY-----"), "a private key");
   assert.equal(findSecret("token ghp_" + "d".repeat(36)), "a GitHub token");
-  for (const ok of ["Built a risk-scoring service in Go", "\\section{Skills} sk-learn, scikit", "Reduced p95 latency 40%", "task-ask-sk-ant"]) assert.equal(findSecret(ok), null, ok);
+  for (const ok of ["Built a risk-scoring service in Go", "\\section{Skills} sk-learn, scikit", "Reduced p95 latency 40%", "task-ask-sk-ant"])
+    assert.equal(findSecret(ok), null, ok);
 });

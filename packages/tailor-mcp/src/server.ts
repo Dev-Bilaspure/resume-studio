@@ -4,14 +4,18 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createTools, type ToolsDeps } from "./tools.ts";
 
-type Extra = { _meta?: { progressToken?: string | number }; sendNotification: (n: { method: "notifications/progress"; params: { progressToken: string | number; progress: number; message?: string } }) => Promise<void> };
+type Extra = {
+  _meta?: { progressToken?: string | number };
+  sendNotification: (n: { method: "notifications/progress"; params: { progressToken: string | number; progress: number; message?: string } }) => Promise<void>;
+};
 
 /** Sends a progress notification per step, when the client asked for them. */
 function progress(extra: Extra) {
   const token = extra._meta?.progressToken;
   if (token === undefined) return undefined;
   let n = 0;
-  return (message: string) => void extra.sendNotification({ method: "notifications/progress", params: { progressToken: token, progress: ++n, message } }).catch(() => {});
+  return (message: string) =>
+    void extra.sendNotification({ method: "notifications/progress", params: { progressToken: token, progress: ++n, message } }).catch(() => {});
 }
 
 const text = (t: string) => ({ content: [{ type: "text" as const, text: t }] });
@@ -20,7 +24,13 @@ const fail = (e: unknown) => ({ content: [{ type: "text" as const, text: (e as E
 export function createMcpServer(deps: ToolsDeps) {
   const tools = createTools(deps);
   const server = new McpServer({ name: "resume-tailor", version: "0.1.0" });
-  const wait = z.number().int().min(0).max(600).optional().describe("How long to wait for the run, in seconds (default 240). It keeps running after; check again with get_tailoring_session.");
+  const wait = z
+    .number()
+    .int()
+    .min(0)
+    .max(600)
+    .optional()
+    .describe("How long to wait for the run, in seconds (default 240). It keeps running after; check again with get_tailoring_session.");
 
   server.registerTool(
     "tailor_resume",
@@ -92,7 +102,8 @@ export function createMcpServer(deps: ToolsDeps) {
     "get_tailoring_session",
     {
       title: "Check a tailoring session",
-      description: "The state of a tailoring session: still working, waiting for answers, or ready with every change and its reason. Resumes a run that was interrupted.",
+      description:
+        "The state of a tailoring session: still working, waiting for answers, or ready with every change and its reason. Resumes a run that was interrupted.",
       inputSchema: { session_id: z.string(), wait_seconds: wait },
     },
     async (a, extra) => {
@@ -108,7 +119,8 @@ export function createMcpServer(deps: ToolsDeps) {
     "save_tailored_resume",
     {
       title: "Save the tailored resume",
-      description: "Writes the tailored resume to a new folder (the original is never changed), with the job description as jd.md. Leave out changes the candidate doesn't want with reject_edit_ids.",
+      description:
+        "Writes the tailored resume to a new folder (the original is never changed), with the job description as jd.md. Leave out changes the candidate doesn't want with reject_edit_ids.",
       inputSchema: {
         session_id: z.string(),
         output_dir: z.string().describe("A new or empty folder"),

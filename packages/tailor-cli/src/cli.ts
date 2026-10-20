@@ -111,7 +111,10 @@ async function answerQuestions(s: Session): Promise<Answer[]> {
   if (opt.answers) {
     const given = JSON.parse(readFileSync(opt.answers, "utf8")) as { topic?: string; question?: string; answer?: string }[];
     return questions.map((q) => {
-      const hit = given.find((g) => (g.topic && q.topic.toLowerCase().includes(g.topic.toLowerCase())) || (g.question && q.question.toLowerCase().includes(g.question.toLowerCase())));
+      const hit = given.find(
+        (g) =>
+          (g.topic && q.topic.toLowerCase().includes(g.topic.toLowerCase())) || (g.question && q.question.toLowerCase().includes(g.question.toLowerCase())),
+      );
       return hit?.answer?.trim() ? { questionId: q.id, text: hit.answer.trim() } : { questionId: q.id, none: true };
     });
   }
@@ -120,7 +123,7 @@ async function answerQuestions(s: Session): Promise<Answer[]> {
     return [];
   }
   console.error(`\n${bold("A few requirements aren't clearly shown on your resume yet.")} If you've done any of these, say where and what, briefly.`);
-  console.error(dim("Answers are used as written and saved for next time. Press Enter for \"I haven't done this\".\n"));
+  console.error(dim('Answers are used as written and saved for next time. Press Enter for "I haven\'t done this".\n'));
   const rl = createInterface({ input: process.stdin, output: process.stderr });
   const out: Answer[] = [];
   for (const [i, q] of questions.entries()) {
@@ -135,7 +138,10 @@ async function answerQuestions(s: Session): Promise<Answer[]> {
 // ---- Output ----------------------------------------------------------------------------------------------------
 
 function plain(m: string) {
-  return m.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1$2");
+  return m
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1$2");
 }
 
 function originalText(s: Session, e: Edit): string | null {
@@ -156,7 +162,11 @@ function summary(s: Session) {
   const lines = [
     "",
     bold(`${jobTitle(s.job)} · ${jobCompany(s.job)}`),
-    ...(s.fit ? [`Fit before tailoring: ${({ strong: "strong fit", stretch: "stretch", "long-shot": "long shot" } as const)[s.fit.level]} (${s.fit.must.strong} of ${s.fit.must.total} must-haves clearly shown${s.fit.gaps.length ? `; not on the resume: ${s.fit.gaps.slice(0, 4).join("; ")}` : ""})`] : []),
+    ...(s.fit
+      ? [
+          `Fit before tailoring: ${({ strong: "strong fit", stretch: "stretch", "long-shot": "long shot" } as const)[s.fit.level]} (${s.fit.must.strong} of ${s.fit.must.total} must-haves clearly shown${s.fit.gaps.length ? `; not on the resume: ${s.fit.gaps.slice(0, 4).join("; ")}` : ""})`,
+        ]
+      : []),
     `${dim("Approach")}  ${s.strategy ?? ""}`,
     `${dim("Requirements clearly shown")}  ${r.before.requirementsStrong} → ${green(String(r.after.requirementsStrong))} of ${r.before.requirementsTotal}    ${dim("Must-have keywords")}  ${r.before.keywordsFound.length} → ${green(String(r.after.keywordsFound.length))} of ${kw}    ${dim("Pages")}  ${r.before.build?.pages ?? "?"} → ${r.after.build?.pages ?? "?"}`,
   ];
@@ -194,7 +204,8 @@ if (s.status === "needs_input") {
 
 if (s.status !== "ready") {
   console.error(red(`\n${s.status === "cancelled" ? "Cancelled." : `Failed: ${s.error?.message ?? "unknown error"}`}`));
-  if (s.status === "failed") console.error(dim(`Session ${s.id}: run again with the same arguments, or inspect ${join(opt.data!, "sessions", `${s.id}.json`)}`));
+  if (s.status === "failed")
+    console.error(dim(`Session ${s.id}: run again with the same arguments, or inspect ${join(opt.data!, "sessions", `${s.id}.json`)}`));
   process.exit(s.error?.kind === "rate_limit" ? 3 : 1);
 }
 
@@ -208,7 +219,12 @@ if (opt.json) {
 }
 
 if (opt.out) {
-  const reject = new Set((opt.reject ?? "").split(",").map((x) => x.trim()).filter(Boolean));
+  const reject = new Set(
+    (opt.reject ?? "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean),
+  );
   const accepted = (s.edits ?? []).filter((e) => e.status !== "dropped" && !reject.has(e.id)).map((e) => e.id);
   const { source: tailored } = await engine.finalize(s.id, accepted);
   try {

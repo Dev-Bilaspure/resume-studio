@@ -46,7 +46,12 @@ export function languageModel(config: ProviderConfig): LanguageModel {
     case "claude-code":
       // Claude Code runs an unknown model name on its default model without saying so: refuse it here.
       if (!CLAUDE_CODE_MODEL.test(config.model))
-        throw new LLMError("unavailable", `"${config.model}" isn't a Claude Code model. Use opus, sonnet, haiku, fable or a full claude-… model id.`, false, "claude-code");
+        throw new LLMError(
+          "unavailable",
+          `"${config.model}" isn't a Claude Code model. Use opus, sonnet, haiku, fable or a full claude-… model id.`,
+          false,
+          "claude-code",
+        );
       // The local Claude Code login (Pro/Max subscription). Isolated from your own Claude Code setup:
       // no tools, no CLAUDE.md/settings/hooks/plugins, and it can't touch files.
       return createClaudeCode({
@@ -83,7 +88,8 @@ export function toLLMError(e: unknown, provider: ProviderId): LLMError {
   if (provider === "claude-code") {
     if (isAuthenticationError(e)) return new LLMError("auth", "Claude Code isn't logged in. Run `claude` in a terminal and log in.", false, provider, e);
     if (isTimeoutError(e)) return new LLMError("timeout", "Claude Code took too long to answer", true, provider, e);
-    if (/ENOENT|not found|spawn/i.test(err?.message ?? "")) return new LLMError("unavailable", "Claude Code isn't installed or can't be started", false, provider, e);
+    if (/ENOENT|not found|spawn/i.test(err?.message ?? ""))
+      return new LLMError("unavailable", "Claude Code isn't installed or can't be started", false, provider, e);
     if (/usage limit|rate limit|limit reached|session limit|hit your .*limit/i.test(err?.message ?? "")) {
       // Claude Code says when it resets ("resets 2:40am (Asia/Calcutta)"): pass that on.
       const resets = /resets? ([^·\n]+)/i.exec(err?.message ?? "")?.[1]?.trim();
@@ -98,9 +104,16 @@ export function toLLMError(e: unknown, provider: ProviderId): LLMError {
     if (s >= 500) return new LLMError("unavailable", `The provider had an error (${s})`, true, provider, e);
     return new LLMError("unknown", e.message, false, provider, e);
   }
-  if (/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed|network/i.test(err?.message ?? "")) return new LLMError("network", "Network error reaching the provider", true, provider, e);
+  if (/ECONNREFUSED|ENOTFOUND|ETIMEDOUT|fetch failed|network/i.test(err?.message ?? ""))
+    return new LLMError("network", "Network error reaching the provider", true, provider, e);
   if (/could not load the default credentials|invalid_grant|unauthenticated/i.test(err?.message ?? "")) {
-    return new LLMError("auth", "Google credentials are missing or expired. Run `gcloud auth application-default login`, or paste a service-account JSON.", false, provider, e);
+    return new LLMError(
+      "auth",
+      "Google credentials are missing or expired. Run `gcloud auth application-default login`, or paste a service-account JSON.",
+      false,
+      provider,
+      e,
+    );
   }
   return new LLMError("unknown", err?.message ?? String(e), false, provider, e);
 }
@@ -153,7 +166,8 @@ export function createLLM(config: ProviderConfig): LLM {
           durationMs: Date.now() - started,
         };
       } catch (e) {
-        if (timeout.aborted && !req.signal?.aborted) throw new LLMError("timeout", `No answer within ${Math.round((req.timeoutMs ?? 300_000) / 1000)} s`, true, config.provider, e);
+        if (timeout.aborted && !req.signal?.aborted)
+          throw new LLMError("timeout", `No answer within ${Math.round((req.timeoutMs ?? 300_000) / 1000)} s`, true, config.provider, e);
         throw toLLMError(e, config.provider);
       }
     },

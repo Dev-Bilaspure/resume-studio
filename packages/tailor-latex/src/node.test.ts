@@ -55,7 +55,12 @@ test("resume folders: read the main file, write a new folder, never over the ori
     assert.equal(source.main, "resume.tex", "found by \\documentclass when there's no main.tex");
     assert.deepEqual(Object.keys(source.files).sort(), ["resume.tex", "sections/exp.tex"]);
 
-    const out = writeResumeFolder(orig, join(root, "tailored"), { main: "resume.tex", files: { ...source.files, "sections/exp.tex": "Built better things." } }, { "jd.md": "# Job" });
+    const out = writeResumeFolder(
+      orig,
+      join(root, "tailored"),
+      { main: "resume.tex", files: { ...source.files, "sections/exp.tex": "Built better things." } },
+      { "jd.md": "# Job" },
+    );
     assert.equal(read(join(out, "sections/exp.tex"), "utf8"), "Built better things.");
     assert.equal(read(join(out, "photo.png"), "utf8"), "PNG", "assets come along");
     assert.ok(existsSync(join(out, "jd.md")));
@@ -72,16 +77,25 @@ test("resume folders: read the main file, write a new folder, never over the ori
 test("font substitution touches font arguments only", async () => {
   const { substituteFont } = await import("./node.ts");
   const out = substituteFont(
-    { "main.tex": "\\setmainfont{Arial}\n\\setsansfont[Scale=0.9]{ Arial }\n\\newfontfamily\\heading{Arial}\nArial is a font.\n\\setmainfont{Arial Black}", "cv.cls": "\\fontspec{Arial}", "refs.bib": "\\setmainfont{Arial}" },
+    {
+      "main.tex": "\\setmainfont{Arial}\n\\setsansfont[Scale=0.9]{ Arial }\n\\newfontfamily\\heading{Arial}\nArial is a font.\n\\setmainfont{Arial Black}",
+      "cv.cls": "\\fontspec{Arial}",
+      "refs.bib": "\\setmainfont{Arial}",
+    },
     "Arial",
     "Liberation Sans",
   );
-  assert.equal(out["main.tex"], "\\setmainfont{Liberation Sans}\n\\setsansfont[Scale=0.9]{ Liberation Sans }\n\\newfontfamily\\heading{Liberation Sans}\nArial is a font.\n\\setmainfont{Arial Black}");
+  assert.equal(
+    out["main.tex"],
+    "\\setmainfont{Liberation Sans}\n\\setsansfont[Scale=0.9]{ Liberation Sans }\n\\newfontfamily\\heading{Liberation Sans}\nArial is a font.\n\\setmainfont{Arial Black}",
+  );
   assert.equal(out["cv.cls"], "\\fontspec{Liberation Sans}");
   assert.equal(out["refs.bib"], "\\setmainfont{Arial}", "only TeX files");
 });
 
-test("the compile service verifier builds drafts like the local one", { skip: !process.env.TAILOR_TEX_SERVICE_URL && "set TAILOR_TEX_SERVICE_URL to a running compile service" }, async () => {
+test("the compile service verifier builds drafts like the local one", {
+  skip: !process.env.TAILOR_TEX_SERVICE_URL && "set TAILOR_TEX_SERVICE_URL to a running compile service",
+}, async () => {
   const v = texServiceVerifier({ url: process.env.TAILOR_TEX_SERVICE_URL! });
   const r = await v.build({ main: "main.tex", files: { "main.tex": classic } }, { maxPages: 1 });
   assert.equal(r.ok, true, JSON.stringify(r.errors));

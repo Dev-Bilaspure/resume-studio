@@ -1,6 +1,15 @@
 // Runs one case: tailor the resume for the posting with the real engine, then audit and screen the result.
 import { LLMError, type LLM } from "@resume-studio/llm";
-import { assessFit, createTailorEngine, jobCompany, jobTitle, memoryFactStore, memorySessionStore, type FitAssessment, type Session } from "@resume-studio/tailor";
+import {
+  assessFit,
+  createTailorEngine,
+  jobCompany,
+  jobTitle,
+  memoryFactStore,
+  memorySessionStore,
+  type FitAssessment,
+  type Session,
+} from "@resume-studio/tailor";
 import { latexAdapter } from "@resume-studio/tailor-latex";
 import { defaultVerifier } from "@resume-studio/tailor-latex/node";
 import { jobInput, type Case } from "./data.ts";
@@ -84,7 +93,10 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
     const given = await answerAsCandidate(deps.judgeLLM, c.resume.history!, qs, deps.signal);
     const byId = new Map(given.map((a) => [a.questionId, a.answer?.trim() || null]));
     asked = qs.map((q) => ({ id: q.id, topic: q.topic, question: q.question, answer: byId.get(q.id) ?? null }));
-    await engine.answer(s.id, asked.map((q) => (q.answer ? { questionId: q.id, text: q.answer } : { questionId: q.id, none: true })));
+    await engine.answer(
+      s.id,
+      asked.map((q) => (q.answer ? { questionId: q.id, text: q.answer } : { questionId: q.id, none: true })),
+    );
     s = await engine.run(s.id, deps.signal);
   }
   // A stop (usage limit) mid-case: surface it so the whole run pauses instead of recording a failure.
@@ -99,7 +111,12 @@ export async function runCase(c: Case, deps: RunDeps): Promise<CaseResult> {
     resume: c.resume.id,
     jd: c.posting.id,
     // As the engine read them (a raw posting has no front matter).
-    posting: { company: jobCompany(s.job), role: jobTitle(s.job), level: c.posting.level ?? s.job.seniority ?? s.profile?.seniority, family: c.posting.family ?? s.profile?.roleFamily },
+    posting: {
+      company: jobCompany(s.job),
+      role: jobTitle(s.job),
+      level: c.posting.level ?? s.job.seniority ?? s.profile?.seniority,
+      family: c.posting.family ?? s.profile?.roleFamily,
+    },
     status: s.status,
     error: s.error?.message,
     engine: {

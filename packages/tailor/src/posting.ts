@@ -6,7 +6,15 @@ import { PostingSchema, postingPrompt, type PostingDetails } from "./prompts.ts"
 export type { PostingDetails };
 
 export async function readPosting(llm: LLM, text: string, signal?: AbortSignal): Promise<PostingDetails> {
-  const res = await llm.generate({ ...postingPrompt(text), schema: PostingSchema, schemaName: "posting_details", temperature: 0, maxOutputTokens: 1_000, signal, step: "read-posting" });
+  const res = await llm.generate({
+    ...postingPrompt(text),
+    schema: PostingSchema,
+    schemaName: "posting_details",
+    temperature: 0,
+    maxOutputTokens: 1_000,
+    signal,
+    step: "read-posting",
+  });
   const d = res.data;
   const clean = (v: string | null) => (v && v.trim() ? v.trim() : null);
   const role = clean(d.role);

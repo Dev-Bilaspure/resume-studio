@@ -13,10 +13,20 @@ export type ProviderCredentials = Omit<ProviderConfig, "model">;
 export function providersFromEnv(env: NodeJS.ProcessEnv = process.env, opts: { claudeCode?: boolean } = {}): ProviderCredentials[] {
   const out: ProviderCredentials[] = [];
   if (env.ANTHROPIC_API_KEY) out.push({ provider: "anthropic", apiKey: env.ANTHROPIC_API_KEY, baseURL: env.ANTHROPIC_BASE_URL });
-  if (env.OPENAI_API_KEY) out.push({ provider: "openai", apiKey: env.OPENAI_API_KEY, baseURL: env.OPENAI_BASE_URL, organization: env.OPENAI_ORGANIZATION, openaiProject: env.OPENAI_PROJECT });
+  if (env.OPENAI_API_KEY)
+    out.push({
+      provider: "openai",
+      apiKey: env.OPENAI_API_KEY,
+      baseURL: env.OPENAI_BASE_URL,
+      organization: env.OPENAI_ORGANIZATION,
+      openaiProject: env.OPENAI_PROJECT,
+    });
   if (env.GOOGLE_VERTEX_PROJECT && env.GOOGLE_VERTEX_LOCATION) {
     const file = env.GOOGLE_APPLICATION_CREDENTIALS;
-    out.push({ provider: "vertex", vertex: { project: env.GOOGLE_VERTEX_PROJECT, location: env.GOOGLE_VERTEX_LOCATION, credentialsJson: file ? readFileSync(file, "utf8") : undefined } });
+    out.push({
+      provider: "vertex",
+      vertex: { project: env.GOOGLE_VERTEX_PROJECT, location: env.GOOGLE_VERTEX_LOCATION, credentialsJson: file ? readFileSync(file, "utf8") : undefined },
+    });
   }
   if (env.TAILOR_ENABLE_CLAUDE_CODE === "1" || opts.claudeCode) out.push({ provider: "claude-code", claudeCodePath: env.CLAUDE_CODE_PATH });
   return out;

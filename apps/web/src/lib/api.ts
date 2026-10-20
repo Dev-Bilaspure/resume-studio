@@ -1,6 +1,18 @@
 "use client";
 
-import type { ApplicationStatus, BuildResult, BuildState, FileContent, FileEntry, OutputFile, ProjectSymbols, ResumeMeta, SnapshotInfo, SystemStatus, WordCount } from "./types";
+import type {
+  ApplicationStatus,
+  BuildResult,
+  BuildState,
+  FileContent,
+  FileEntry,
+  OutputFile,
+  ProjectSymbols,
+  ResumeMeta,
+  SnapshotInfo,
+  SystemStatus,
+  WordCount,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -41,8 +53,10 @@ export const api = {
   list: () => req<{ resumes: ResumeSummary[]; templates: TemplateInfo[] }>("/api/resumes"),
   create: (body: { name: string; template?: string; duplicateOf?: string }) => req<ResumeMeta>("/api/resumes", { method: "POST", body: JSON.stringify(body) }),
   get: (id: string) => req<{ meta: ResumeMeta; files: FileEntry[]; build: BuildState }>(r(id)),
-  update: (id: string, patch: Partial<Pick<ResumeMeta, "name" | "engine" | "mainFile" | "trusted" | "haltOnError">> & { applicationStatus?: ApplicationStatus }) =>
-    req<ResumeMeta>(r(id), { method: "PATCH", body: JSON.stringify(patch) }),
+  update: (
+    id: string,
+    patch: Partial<Pick<ResumeMeta, "name" | "engine" | "mainFile" | "trusted" | "haltOnError">> & { applicationStatus?: ApplicationStatus },
+  ) => req<ResumeMeta>(r(id), { method: "PATCH", body: JSON.stringify(patch) }),
   remove: (id: string) => req<void>(r(id), { method: "DELETE" }),
   compile: (id: string) => req<void>(`${r(id)}/compile`, { method: "POST" }),
   /** "Clear cached files": drop the aux files, then rebuild. */

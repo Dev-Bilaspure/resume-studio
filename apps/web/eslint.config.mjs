@@ -17,7 +17,9 @@ const eslintConfig = defineConfig([
             { name: "@resume-studio/tailor", message: "Server only. Import types, or helpers from @resume-studio/tailor/job.", allowTypeImports: true },
             { name: "@resume-studio/llm", message: "Server only. Import types instead.", allowTypeImports: true },
           ],
-          patterns: [{ group: ["@resume-studio/tailor-*", "@resume-studio/llm/*", "@resume-studio/tailor/node"], message: "Server only.", allowTypeImports: true }],
+          patterns: [
+            { group: ["@resume-studio/tailor-*", "@resume-studio/llm/*", "@resume-studio/tailor/node"], message: "Server only.", allowTypeImports: true },
+          ],
         },
       ],
     },

@@ -45,7 +45,9 @@ class HttpError extends Error {
 const bad = (message: string) => new HttpError(400, "bad_request", message);
 
 // TeX Live installs outside the default PATH on macOS; the container has it on PATH already.
-const PATH = [...(process.env.PATH ?? "").split(delimiter), "/Library/TeX/texbin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"].filter(Boolean).join(delimiter);
+const PATH = [...(process.env.PATH ?? "").split(delimiter), "/Library/TeX/texbin", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+  .filter(Boolean)
+  .join(delimiter);
 const toolEnv = { PATH };
 
 function findTool(name: string): boolean {
@@ -244,7 +246,9 @@ export async function createTexService(config: TexServiceConfig): Promise<TexSer
     if (!body || typeof body.main !== "string" || !isSafeRelativePath(body.main)) throw bad("`main` must be a relative path in the project");
     const state = await loadState(id);
     if (!(body.main in state.files)) throw bad(`The project has no file "${body.main}": sync it first`);
-    const r = await slot(() => run("texcount", ["-inc", "-total", "-merge", "-utf8", "-sum=1,1,1", body.main], { cwd: projectDir(id), timeoutMs: 30_000, env: toolEnv }));
+    const r = await slot(() =>
+      run("texcount", ["-inc", "-total", "-merge", "-utf8", "-sum=1,1,1", body.main], { cwd: projectDir(id), timeoutMs: 30_000, env: toolEnv }),
+    );
     if (r.error) throw new HttpError(500, "internal", "texcount isn't available");
     return { code: r.code, stdout: r.stdout, stderr: tail(r.stderr, 20) };
   }
@@ -373,7 +377,9 @@ export async function createTexService(config: TexServiceConfig): Promise<TexSer
       return;
     }
     const text = JSON.stringify(payload);
-    res.writeHead(status, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(text), "cache-control": "no-store" }).end(text);
+    res
+      .writeHead(status, { "content-type": "application/json; charset=utf-8", "content-length": Buffer.byteLength(text), "cache-control": "no-store" })
+      .end(text);
   }
 
   async function route(req: IncomingMessage, res: ServerResponse) {
@@ -435,7 +441,8 @@ export async function createTexService(config: TexServiceConfig): Promise<TexSer
     inFlight.add(p);
     void p.finally(() => {
       inFlight.delete(p);
-      if (config.logRequests && req.url !== "/health") console.log(`[tex-service] ${req.method} ${req.url?.split("?")[0]} ${res.statusCode} ${Date.now() - started}ms`);
+      if (config.logRequests && req.url !== "/health")
+        console.log(`[tex-service] ${req.method} ${req.url?.split("?")[0]} ${res.statusCode} ${Date.now() - started}ms`);
     });
   });
   // Builds can take minutes: don't let Node's defaults cut a request off.

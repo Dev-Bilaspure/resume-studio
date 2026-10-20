@@ -62,7 +62,12 @@ const SCREEN_SYSTEM = `You are an experienced technical recruiter screening soft
 
 Read the resume as you would in a real screen: quickly, looking for evidence of each requirement in the posting's terms. Judge only what is written; don't reward length or formatting, and don't assume experience the resume doesn't state.`;
 
-export async function screenOne(llm: LLM, posting: { company: string; role: string; description: string }, resume: string, signal?: AbortSignal): Promise<Screen> {
+export async function screenOne(
+  llm: LLM,
+  posting: { company: string; role: string; description: string },
+  resume: string,
+  signal?: AbortSignal,
+): Promise<Screen> {
   const res = await llm.generate({
     system: SCREEN_SYSTEM,
     prompt: `ROLE: ${posting.role} at ${posting.company}\n\nJOB POSTING:\n"""\n${posting.description.trim()}\n"""\n\nRESUME:\n"""\n${resume.trim()}\n"""`,

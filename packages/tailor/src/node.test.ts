@@ -26,6 +26,9 @@ test("facts saved at the same time are all kept, and duplicates aren't", async (
   assert.equal((await store.list()).length, 20);
   await store.add([fact(3), { ...fact(99), text: "Fact number 4" }]);
   assert.equal((await store.list()).length, 20, "same id or same text: kept once");
-  await store.add([{ ...fact(50), kind: "lacks", topic: "Kubernetes" }, { ...fact(51), kind: "lacks", topic: "kubernetes" }]);
+  await store.add([
+    { ...fact(50), kind: "lacks", topic: "Kubernetes" },
+    { ...fact(51), kind: "lacks", topic: "kubernetes" },
+  ]);
   assert.equal((await store.list()).filter((f) => f.kind === "lacks").length, 1, "a declined topic is kept once");
 });

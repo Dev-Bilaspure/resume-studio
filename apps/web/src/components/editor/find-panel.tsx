@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  SearchQuery,
-  closeSearchPanel,
-  findNext,
-  findPrevious,
-  getSearchQuery,
-  replaceAll,
-  replaceNext,
-  setSearchQuery,
-} from "@codemirror/search";
+import { SearchQuery, closeSearchPanel, findNext, findPrevious, getSearchQuery, replaceAll, replaceNext, setSearchQuery } from "@codemirror/search";
 import { EditorSelection, type EditorState } from "@codemirror/state";
 import { EditorView, type Panel, type ViewUpdate } from "@codemirror/view";
 import { ArrowDown, ArrowUp, CaseSensitive, ChevronRight, Regex, Replace, ReplaceAll, WholeWord, X } from "lucide-react";
@@ -212,7 +203,10 @@ function FindWidget({ panel }: { panel: FindPanel }) {
             </FindToggle>
           </div>
           <span
-            className={cn("w-20 shrink-0 text-center tabular-nums", query.search && (!query.valid || total === 0) ? "text-destructive" : "text-muted-foreground")}
+            className={cn(
+              "w-20 shrink-0 text-center tabular-nums",
+              query.search && (!query.valid || total === 0) ? "text-destructive" : "text-muted-foreground",
+            )}
             aria-live="polite"
           >
             {status}

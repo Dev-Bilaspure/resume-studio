@@ -218,11 +218,43 @@ const TERMS: Record<string, string[]> = {
  * terms without a citation for the exact word ("latency", "scalable", "mentored").
  */
 const SOFT = new Set([
-  "Distributed systems", "Microservices", "Event-driven architecture", "System design", "Concurrency", "Scalability",
-  "High availability", "Caching", "Data modeling", "API design", "Test-driven development", "Unit testing",
-  "Integration testing", "End-to-end testing", "Agile", "Code review", "Mentoring", "On-call", "Observability",
-  "Security", "Performance", "Accessibility", "Payments", "Fintech", "Data structures", "Machine Learning",
-  "Deep Learning", "LLMs", "RAG", "Vector search", "MLOps", "REST APIs", "Serverless", "Docker", "CI/CD", "Linux", "Bash",
+  "Distributed systems",
+  "Microservices",
+  "Event-driven architecture",
+  "System design",
+  "Concurrency",
+  "Scalability",
+  "High availability",
+  "Caching",
+  "Data modeling",
+  "API design",
+  "Test-driven development",
+  "Unit testing",
+  "Integration testing",
+  "End-to-end testing",
+  "Agile",
+  "Code review",
+  "Mentoring",
+  "On-call",
+  "Observability",
+  "Security",
+  "Performance",
+  "Accessibility",
+  "Payments",
+  "Fintech",
+  "Data structures",
+  "Machine Learning",
+  "Deep Learning",
+  "LLMs",
+  "RAG",
+  "Vector search",
+  "MLOps",
+  "REST APIs",
+  "Serverless",
+  "Docker",
+  "CI/CD",
+  "Linux",
+  "Bash",
 ]);
 
 export function isSoftTerm(term: string): boolean {
@@ -241,7 +273,19 @@ export const LEXICON: LexiconEntry[] = Object.entries(TERMS).map(([term, aliases
  * pgvector is PostgreSQL. Only certain implications belong here (a product of exactly one platform).
  */
 const IMPLIES: Record<string, string[]> = {
-  AWS: ["AWS Lambda", "Amazon EC2", "Amazon S3", "Amazon ECS", "Amazon EKS", "Amazon RDS", "AWS CloudFormation", "AWS CDK", "DynamoDB", "Amazon SQS", "Amazon SNS"],
+  AWS: [
+    "AWS Lambda",
+    "Amazon EC2",
+    "Amazon S3",
+    "Amazon ECS",
+    "Amazon EKS",
+    "Amazon RDS",
+    "AWS CloudFormation",
+    "AWS CDK",
+    "DynamoDB",
+    "Amazon SQS",
+    "Amazon SNS",
+  ],
   GCP: ["Google Kubernetes Engine", "Cloud Functions", "Cloud Run", "BigQuery"],
   Azure: ["Azure Kubernetes Service"],
   Kubernetes: ["Amazon EKS", "Google Kubernetes Engine", "Azure Kubernetes Service"],
@@ -254,7 +298,31 @@ export function impliedBy(term: string): string[] {
 }
 
 /** Single-letter / ambiguous terms only count when written exactly (case-sensitive): "C", "R", "Go". */
-const CASE_SENSITIVE = new Set(["C", "R", "Go", "Next", "Node", "Spark", "Modal", "Bun", "Elastic", "Rails", "CI", "HA", "ML", "TS", "JS", "Lambda", "Spring", "Bull", "shell", "containers", "Unix", "LLM", "HCL"]);
+const CASE_SENSITIVE = new Set([
+  "C",
+  "R",
+  "Go",
+  "Next",
+  "Node",
+  "Spark",
+  "Modal",
+  "Bun",
+  "Elastic",
+  "Rails",
+  "CI",
+  "HA",
+  "ML",
+  "TS",
+  "JS",
+  "Lambda",
+  "Spring",
+  "Bull",
+  "shell",
+  "containers",
+  "Unix",
+  "LLM",
+  "HCL",
+]);
 
 function escapeRe(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

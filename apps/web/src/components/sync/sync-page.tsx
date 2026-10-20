@@ -1,6 +1,18 @@
 "use client";
 
-import { ArrowDownToLine, ArrowUpFromLine, Check, ChevronDown, CircleAlert, CloudOff, ExternalLink, Loader2, RefreshCw, ShieldCheck, Unplug } from "lucide-react";
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Check,
+  ChevronDown,
+  CircleAlert,
+  CloudOff,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  Unplug,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { TailorHeader } from "@/components/tailor/tailor-header";
@@ -60,8 +72,8 @@ export function SyncPage() {
         <div>
           <h1 className="text-2xl font-semibold">Backup &amp; sync</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Keep your resumes, facts and tailoring history in a private repository you own. Upload what changed here; download it on another computer, or
-            on this one after losing the folder.
+            Keep your resumes, facts and tailoring history in a private repository you own. Upload what changed here; download it on another computer, or on
+            this one after losing the folder.
           </p>
         </div>
 
@@ -70,7 +82,16 @@ export function SyncPage() {
             <Loader2 className="mr-2 size-4 animate-spin" /> Loading…
           </div>
         ) : !status.connected ? (
-          <Connect busy={busy === "connecting"} onConnect={(url) => act("connecting", () => syncApi.connect(url), () => "Connected")} />
+          <Connect
+            busy={busy === "connecting"}
+            onConnect={(url) =>
+              act(
+                "connecting",
+                () => syncApi.connect(url),
+                () => "Connected",
+              )
+            }
+          />
         ) : (
           <Connected
             status={status}
@@ -129,7 +150,13 @@ function Connect({ busy, onConnect }: { busy: boolean; onConnect(url: string): v
           if (url.trim()) onConnect(url.trim());
         }}
       >
-        <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://github.com/you/resume-studio-data" aria-label="Repository address" className="flex-1" />
+        <Input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://github.com/you/resume-studio-data"
+          aria-label="Repository address"
+          className="flex-1"
+        />
         <Button type="submit" disabled={busy || !url.trim()}>
           {busy && <Loader2 className="animate-spin" />}
           Connect
@@ -172,8 +199,10 @@ function Connected({
   const checkFailed = status.lastCheck?.error;
   const inSync = !outgoing && !incoming && !checkFailed && !status.remoteProblem && !!status.lastCheck;
   const uploadBlocked =
-    status.blocked ?? (incoming ? "Download the repository's changes first, so nothing there is overwritten." : status.remoteProblem ? status.remoteProblem : null);
-  const downloadBlocked = status.blocked ?? status.remoteProblem ?? (unchosen ? `Choose a version for ${unchosen} file${unchosen === 1 ? "" : "s"} changed in both places.` : null);
+    status.blocked ??
+    (incoming ? "Download the repository's changes first, so nothing there is overwritten." : status.remoteProblem ? status.remoteProblem : null);
+  const downloadBlocked =
+    status.blocked ?? status.remoteProblem ?? (unchosen ? `Choose a version for ${unchosen} file${unchosen === 1 ? "" : "s"} changed in both places.` : null);
 
   return (
     <>
@@ -275,7 +304,8 @@ function Connected({
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect this computer?</AlertDialogTitle>
             <AlertDialogDescription>
-              Your files here and the repository stay as they are. {outgoing ? `${outgoing} change${outgoing === 1 ? " isn't" : "s aren't"} uploaded yet. ` : ""}
+              Your files here and the repository stay as they are.{" "}
+              {outgoing ? `${outgoing} change${outgoing === 1 ? " isn't" : "s aren't"} uploaded yet. ` : ""}
               You can connect again any time.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -299,14 +329,31 @@ function Connected({
 
 function Banner({ tone, icon, children }: { tone: "info" | "warning"; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className={cn("flex items-start gap-2 rounded-lg border px-4 py-3 text-sm", tone === "warning" ? "border-warning/30 bg-warning/10" : "text-muted-foreground")}>
+    <div
+      className={cn(
+        "flex items-start gap-2 rounded-lg border px-4 py-3 text-sm",
+        tone === "warning" ? "border-warning/30 bg-warning/10" : "text-muted-foreground",
+      )}
+    >
       {icon ?? <CircleAlert className={cn("mt-0.5 size-4 shrink-0", tone === "warning" && "text-warning")} />}
       <p>{children}</p>
     </div>
   );
 }
 
-function ActionButton({ icon, busy, disabled, onClick, children }: { icon: React.ReactNode; busy: boolean; disabled: boolean; onClick(): void; children: React.ReactNode }) {
+function ActionButton({
+  icon,
+  busy,
+  disabled,
+  onClick,
+  children,
+}: {
+  icon: React.ReactNode;
+  busy: boolean;
+  disabled: boolean;
+  onClick(): void;
+  children: React.ReactNode;
+}) {
   return (
     <Button size="sm" disabled={disabled} onClick={onClick}>
       {busy ? <Loader2 className="animate-spin" /> : icon}
@@ -444,7 +491,14 @@ function Conflicts({
                   ["remote", "Use the repository's"],
                 ] as const
               ).map(([side, label]) => (
-                <Button key={side} type="button" size="xs" variant={choices[c.path] === side ? "default" : "outline"} disabled={disabled} onClick={() => onChoose(c.path, side)}>
+                <Button
+                  key={side}
+                  type="button"
+                  size="xs"
+                  variant={choices[c.path] === side ? "default" : "outline"}
+                  disabled={disabled}
+                  onClick={() => onChoose(c.path, side)}
+                >
                   {choices[c.path] === side && <Check />}
                   {label}
                 </Button>
@@ -482,7 +536,11 @@ function FileRow({ path, label, chip, side }: { path: string; label: string; chi
       <button type="button" onClick={() => void toggle()} className="flex w-full items-center gap-2 text-left hover:text-foreground">
         {chip && <span className={cn("w-14 shrink-0 rounded px-1 py-0.5 text-center text-[10.5px] font-medium", chip.cls)}>{chip.label}</span>}
         <span className={cn("min-w-0 flex-1 truncate font-mono", side === "conflict" ? "font-sans text-primary" : "text-muted-foreground")}>{label}</span>
-        {loading ? <Loader2 className="size-3 animate-spin" /> : <ChevronDown className={cn("size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />}
+        {loading ? (
+          <Loader2 className="size-3 animate-spin" />
+        ) : (
+          <ChevronDown className={cn("size-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+        )}
       </button>
       {open && diff && <DiffView diff={diff} />}
     </li>
@@ -490,7 +548,8 @@ function FileRow({ path, label, chip, side }: { path: string; label: string; chi
 }
 
 function DiffView({ diff }: { diff: SyncDiff }) {
-  if (diff.binary) return <p className="mt-1.5 rounded-md bg-muted px-3 py-2 text-muted-foreground">A binary file (an image or PDF): no text changes to show.</p>;
+  if (diff.binary)
+    return <p className="mt-1.5 rounded-md bg-muted px-3 py-2 text-muted-foreground">A binary file (an image or PDF): no text changes to show.</p>;
   if (!diff.text.trim()) return <p className="mt-1.5 rounded-md bg-muted px-3 py-2 text-muted-foreground">No differences in the text.</p>;
   return (
     <pre className="mt-1.5 max-h-96 overflow-auto rounded-md border bg-muted/40 py-2 font-mono text-[11px] leading-relaxed">

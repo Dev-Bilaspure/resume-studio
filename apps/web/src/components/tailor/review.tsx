@@ -212,24 +212,24 @@ export function Review({ session }: { session: SessionView }) {
                     No changes passed the checks. Your resume already fits this job as well as it truthfully can.
                   </p>
                 )}
-                  {groups.map(([section, list]) => (
-                    <section key={section}>
-                      <h3 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">{section}</h3>
-                      <ul className="space-y-3">
-                        {list.map((e) => (
-                          <EditCard
-                            key={e.id}
-                            edit={e}
-                            session={session}
-                            facts={facts}
-                            requirements={requirements}
-                            accepted={accepted.has(e.id)}
-                            onToggle={(on) => toggle(e.id, on)}
-                          />
-                        ))}
-                      </ul>
-                    </section>
-                  ))}
+                {groups.map(([section, list]) => (
+                  <section key={section}>
+                    <h3 className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">{section}</h3>
+                    <ul className="space-y-3">
+                      {list.map((e) => (
+                        <EditCard
+                          key={e.id}
+                          edit={e}
+                          session={session}
+                          facts={facts}
+                          requirements={requirements}
+                          accepted={accepted.has(e.id)}
+                          onToggle={(on) => toggle(e.id, on)}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
                 {(dropped.length > 0 || (session.skippedSuggestions?.length ?? 0) > 0) && (
                   <Dropped
                     ref={droppedRef}

@@ -3,7 +3,17 @@
 // assistant to read and relay: what happened, what changed and why, and what to call next.
 import { resolve } from "node:path";
 import { createLLM, type LLM, type ProviderConfig } from "@resume-studio/llm";
-import { createTailorEngine, jobCompany, jobTitle, type Answer, type Edit, type FactStore, type Seniority, type Session, type SessionStore } from "@resume-studio/tailor";
+import {
+  createTailorEngine,
+  jobCompany,
+  jobTitle,
+  type Answer,
+  type Edit,
+  type FactStore,
+  type Seniority,
+  type Session,
+  type SessionStore,
+} from "@resume-studio/tailor";
 import { latexAdapter } from "@resume-studio/tailor-latex";
 import { defaultVerifier, readResumeFolder, writeResumeFolder } from "@resume-studio/tailor-latex/node";
 
@@ -87,9 +97,16 @@ export function createTools(deps: ToolsDeps) {
       return describe(await waitFor(s.id, args.waitSeconds ?? 240, args.onProgress), running.has(s.id));
     },
 
-    async answer(args: { sessionId: string; answers: { questionId: string; answer?: string; none?: boolean }[]; waitSeconds?: number; onProgress?: (m: string) => void }) {
+    async answer(args: {
+      sessionId: string;
+      answers: { questionId: string; answer?: string; none?: boolean }[];
+      waitSeconds?: number;
+      onProgress?: (m: string) => void;
+    }) {
       const s = await load(args.sessionId);
-      const answers: Answer[] = args.answers.map((a) => (a.answer?.trim() && !a.none ? { questionId: a.questionId, text: a.answer.trim() } : { questionId: a.questionId, none: true }));
+      const answers: Answer[] = args.answers.map((a) =>
+        a.answer?.trim() && !a.none ? { questionId: a.questionId, text: a.answer.trim() } : { questionId: a.questionId, none: true },
+      );
       await engine(s.context.resumeDir).answer(s.id, answers);
       startRun(await load(s.id));
       return describe(await waitFor(s.id, args.waitSeconds ?? 240, args.onProgress), running.has(s.id));
@@ -109,7 +126,9 @@ export function createTools(deps: ToolsDeps) {
       const reject = new Set(args.rejectEditIds ?? []);
       const accepted = (s.edits ?? []).filter((e) => e.status !== "dropped" && !reject.has(e.id)).map((e) => e.id);
       const { source } = await engine(s.context.resumeDir).finalize(s.id, accepted);
-      const out = writeResumeFolder(s.context.resumeDir, args.outputDir, source, { "jd.md": `# ${jobTitle(s.job)} · ${jobCompany(s.job)}\n\n${s.job.description.trim()}\n` });
+      const out = writeResumeFolder(s.context.resumeDir, args.outputDir, source, {
+        "jd.md": `# ${jobTitle(s.job)} · ${jobCompany(s.job)}\n\n${s.job.description.trim()}\n`,
+      });
       return `Saved to ${out} with ${accepted.length} of ${(s.edits ?? []).filter((e) => e.status !== "dropped").length} changes (main file: ${source.main}; the job description is in jd.md). The original at ${s.context.resumeDir} is unchanged.`;
     },
   };
@@ -118,7 +137,10 @@ export function createTools(deps: ToolsDeps) {
 // ---- Describing a session for an assistant --------------------------------------------------------------
 
 function plain(markup: string) {
-  return markup.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1$2");
+  return markup
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1$2");
 }
 
 function original(s: Session, e: Edit): string | null {
@@ -153,7 +175,11 @@ export function describe(s: Session, running: boolean): string {
   const dropped = (s.edits ?? []).filter((e) => e.status === "dropped");
   const lines = [
     head,
-    ...(s.fit ? [`Fit before tailoring: ${({ strong: "strong fit", stretch: "stretch", "long-shot": "long shot" } as const)[s.fit.level]} (${s.fit.must.strong} of ${s.fit.must.total} must-haves clearly shown${s.fit.gaps.length ? `; not on the resume: ${s.fit.gaps.slice(0, 4).join("; ")}` : ""})`] : []),
+    ...(s.fit
+      ? [
+          `Fit before tailoring: ${({ strong: "strong fit", stretch: "stretch", "long-shot": "long shot" } as const)[s.fit.level]} (${s.fit.must.strong} of ${s.fit.must.total} must-haves clearly shown${s.fit.gaps.length ? `; not on the resume: ${s.fit.gaps.slice(0, 4).join("; ")}` : ""})`,
+        ]
+      : []),
     `Approach: ${s.strategy ?? ""}`,
     `Requirements clearly shown: ${r.before.requirementsStrong} → ${r.after.requirementsStrong} of ${r.before.requirementsTotal}. Must-have keywords: ${r.before.keywordsFound.length} → ${r.after.keywordsFound.length} of ${r.before.keywordsFound.length + r.before.keywordsMissing.length}${r.after.keywordsMissing.length ? ` (not claimed, no evidence: ${r.after.keywordsMissing.join(", ")})` : ""}. Pages: ${r.before.build?.pages ?? "?"} → ${r.after.build?.pages ?? "?"}.`,
     ...(r.warnings.length ? [`Warnings: ${r.warnings.join(" ")}`] : []),
@@ -164,7 +190,9 @@ export function describe(s: Session, running: boolean): string {
       const text = "text" in e.change ? plain(e.change.text) : e.change.op === "reorder_bullets" ? `new order: ${e.change.order.join(", ")}` : "(removed)";
       return `- [${e.id}] ${e.change.op}${e.status === "flagged" ? " (check this)" : ""}: ${before ? `"${plain(before)}" → ` : ""}"${text}"\n  why: ${e.reason}`;
     }),
-    ...(dropped.length ? [``, `Left out after the fact-check (${dropped.length}): ${dropped.map((e) => `[${e.id}] ${(e.issues ?? []).join(" ")}`).join("; ")}`] : []),
+    ...(dropped.length
+      ? [``, `Left out after the fact-check (${dropped.length}): ${dropped.map((e) => `[${e.id}] ${(e.issues ?? []).join(" ")}`).join("; ")}`]
+      : []),
     ``,
     `To keep it: save_tailored_resume with this session_id and a new output_dir (pass reject_edit_ids to leave changes out).`,
   ];

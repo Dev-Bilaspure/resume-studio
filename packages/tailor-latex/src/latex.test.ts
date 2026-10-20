@@ -8,7 +8,10 @@ const classic = readFileSync(new URL("./fixtures/classic.tex", import.meta.url),
 const src = (main: string, files: Record<string, string> = {}) => ({ main: "main.tex", files: { "main.tex": main, ...files } });
 
 test("markup ⇄ LaTeX", () => {
-  assert.equal(latexToMarkup(String.raw`Cut p99 latency \textbf{75\%} (480\,ms$\to$120\,ms) for \emph{all} \href{https://x.io}{users} -- fast`), "Cut p99 latency **75%** (480 ms→120 ms) for *all* [users](https://x.io) – fast");
+  assert.equal(
+    latexToMarkup(String.raw`Cut p99 latency \textbf{75\%} (480\,ms$\to$120\,ms) for \emph{all} \href{https://x.io}{users} -- fast`),
+    "Cut p99 latency **75%** (480 ms→120 ms) for *all* [users](https://x.io) – fast",
+  );
   assert.equal(markupToLatex("Cut **75%** of $2B & #1 C# _x_ – done → ok"), String.raw`Cut \textbf{75\%} of \$2B \& \#1 C\# \_x\_ -- done $\rightarrow$ ok`);
   assert.equal(markupToLatex('Said "hi" [site](https://a.b/c%20d)'), "Said ``hi'' \\href{https://a.b/c\\%20d}{site}");
 });
@@ -16,10 +19,16 @@ test("markup ⇄ LaTeX", () => {
 test("parse the Classic template", () => {
   const { doc } = parseLatex(src(classic));
   assert.equal(doc.headline?.text, "Senior Software Engineer");
-  assert.deepEqual(doc.sections.map((s) => s.kind), ["summary", "experience", "projects", "education", "skills"]);
+  assert.deepEqual(
+    doc.sections.map((s) => s.kind),
+    ["summary", "experience", "projects", "education", "skills"],
+  );
   assert.equal(doc.sections[1].lists[0].bullets.length, 4);
   assert.match(doc.sections[1].lists[0].heading, /Foo Payments/);
-  assert.deepEqual(doc.sections[4].skills.map((k) => k.label), ["Languages", "Infrastructure", "Data", "Practices"]);
+  assert.deepEqual(
+    doc.sections[4].skills.map((k) => k.label),
+    ["Languages", "Infrastructure", "Data", "Practices"],
+  );
   assert.ok(doc.sections[0].paragraph?.text.startsWith("Backend engineer with 8 years"));
 });
 
@@ -78,12 +87,18 @@ test("macro bullets (Jake's \\resumeItem) and custom list macros", () => {
 \end{document}`;
   const { doc } = parseLatex(src(main));
   const bullets = doc.sections[0].lists[0].bullets;
-  assert.deepEqual(bullets.map((b) => b.text), ["Developed a REST API using FastAPI and PostgreSQL", "Explored ways to visualize GitHub collaboration"]);
+  assert.deepEqual(
+    bullets.map((b) => b.text),
+    ["Developed a REST API using FastAPI and PostgreSQL", "Explored ways to visualize GitHub collaboration"],
+  );
   const { source } = applyLatex(src(main), [
     { id: "e1", change: { op: "rewrite_bullet", target: bullets[0].id, text: "Built a **REST API** in **FastAPI** on **PostgreSQL**" } },
     { id: "e2", change: { op: "add_bullet", target: doc.sections[0].lists[0].id, after: null, text: "Led the data pipeline" } },
   ]);
-  assert.match(source.files["main.tex"], /\\resumeItemListStart\n        \\resumeItem\{Led the data pipeline\}\n        \\resumeItem\{Built a \\textbf\{REST API\} in \\textbf\{FastAPI\} on \\textbf\{PostgreSQL\}\}\n        \\resumeItem\{Explored/);
+  assert.match(
+    source.files["main.tex"],
+    /\\resumeItemListStart\n        \\resumeItem\{Led the data pipeline\}\n        \\resumeItem\{Built a \\textbf\{REST API\} in \\textbf\{FastAPI\} on \\textbf\{PostgreSQL\}\}\n        \\resumeItem\{Explored/,
+  );
 });
 
 test("bullets in \\input files are edited in their own file", () => {
@@ -103,7 +118,9 @@ test("bullets in \\input files are edited in their own file", () => {
 test("the adapter maps a build error line back to the edit", () => {
   const s = src(classic);
   const { doc } = parseLatex(s);
-  const draft = latexAdapter.apply(s, doc, [{ id: "e1", change: { op: "set_headline", target: "h1", text: "Backend Engineer" } }]) as ReturnType<typeof applyLatex>["source"];
+  const draft = latexAdapter.apply(s, doc, [{ id: "e1", change: { op: "set_headline", target: "h1", text: "Backend Engineer" } }]) as ReturnType<
+    typeof applyLatex
+  >["source"];
   const line = draft.files["main.tex"].split("\n").findIndex((l) => l.includes("Backend Engineer\\sep")) + 1;
   assert.equal(latexAdapter.editAt(draft, { file: "main.tex", line }), "e1");
   assert.equal(latexAdapter.editAt(draft, { file: "main.tex", line: 1 }), null);

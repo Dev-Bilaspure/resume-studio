@@ -107,7 +107,8 @@ function git(args: string[], opts: { input?: string; network?: boolean } = {}) {
 async function gitOk(args: string[], opts: { input?: string; network?: boolean } = {}): Promise<string> {
   const r = await git(args, opts);
   if (r.error) throw new HttpError(503, "git isn't installed");
-  if (r.timedOut) throw new HttpError(504, opts.network ? "The repository didn't answer in time. Check your connection and try again." : `git ${args[0]} took too long`);
+  if (r.timedOut)
+    throw new HttpError(504, opts.network ? "The repository didn't answer in time. Check your connection and try again." : `git ${args[0]} took too long`);
   if (r.code !== 0) throw opts.network ? networkError(r.stderr) : new Error(`git ${args[0]} failed: ${r.stderr.trim() || r.stdout.trim()}`);
   return r.stdout;
 }
@@ -116,10 +117,14 @@ async function gitOk(args: string[], opts: { input?: string; network?: boolean }
 function networkError(stderr: string): HttpError {
   const s = stderr.toLowerCase();
   if (/authentication failed|could not read username|permission denied|403|terminal prompts disabled|access denied|publickey/.test(s)) {
-    return new HttpError(401, "GitHub didn't accept your login for this repository. Check that `git push` to it works in a terminal (for example after `gh auth login`), then try again.");
+    return new HttpError(
+      401,
+      "GitHub didn't accept your login for this repository. Check that `git push` to it works in a terminal (for example after `gh auth login`), then try again.",
+    );
   }
   if (/repository not found|not found|does not exist/.test(s)) return new HttpError(404, "That repository wasn't found, or your login can't see it.");
-  if (/could not resolve host|unable to access|network|timed out|connection/.test(s)) return new HttpError(503, "Couldn't reach the repository. Check your connection and try again.");
+  if (/could not resolve host|unable to access|network|timed out|connection/.test(s))
+    return new HttpError(503, "Couldn't reach the repository. Check your connection and try again.");
   return new HttpError(502, `The repository refused the request: ${stderr.trim().split("\n").at(-1)}`);
 }
 
@@ -278,7 +283,8 @@ function describer(commits: (string | null)[]): Describe {
   };
   return async (path) => {
     if (path === ".resume-studio/ai.json") return { group: "settings", groupLabel: "AI provider settings", label: "ai.json" };
-    if (path === ".resume-studio/preferences.json") return { group: "settings", groupLabel: "Preferences (editor, preview, layout)", label: "preferences.json" };
+    if (path === ".resume-studio/preferences.json")
+      return { group: "settings", groupLabel: "Preferences (editor, preview, layout)", label: "preferences.json" };
     const trashed = /^\.resume-studio\/trash\/([^/]+)\/(.+)$/.exec(path);
     if (trashed) {
       const meta = (await json(`.resume-studio/trash/${trashed[1]}/resume.json`)) as { name?: string } | null;
@@ -379,23 +385,33 @@ async function checkPrivate(url: string) {
   if (!m) return;
   let status: number;
   try {
-    status = (await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}`, { headers: { accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(15_000) })).status;
+    status = (
+      await fetch(`https://api.github.com/repos/${m[1]}/${m[2]}`, { headers: { accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(15_000) })
+    ).status;
   } catch {
     throw new HttpError(503, "Couldn't reach GitHub to check that the repository is private. Check your connection and try again.");
   }
-  if (status === 200) throw new HttpError(400, "This repository is public: anyone could read your resumes and answers. Make it private on GitHub (Settings → General → Danger Zone), then connect again.");
+  if (status === 200)
+    throw new HttpError(
+      400,
+      "This repository is public: anyone could read your resumes and answers. Make it private on GitHub (Settings → General → Danger Zone), then connect again.",
+    );
   if (status !== 404) throw new HttpError(503, `GitHub answered ${status} when checking that the repository is private. Try again in a minute.`);
 }
 
 export async function connectSync(rawUrl: string): Promise<SyncStatus> {
   const url = rawUrl.trim().replace(/\/+$/, "");
   // A hosted repository (https, ssh), or one in a folder (file://, e.g. on an external drive).
-  if (!/^(https:\/\/|ssh:\/\/|git@|file:\/\/\/)[^\s]+$/.test(url)) throw new HttpError(400, "Paste the repository's address, like https://github.com/you/resume-studio-data");
+  if (!/^(https:\/\/|ssh:\/\/|git@|file:\/\/\/)[^\s]+$/.test(url))
+    throw new HttpError(400, "Paste the repository's address, like https://github.com/you/resume-studio-data");
   const config = await readConfig();
   if (config && config.url !== url) throw new HttpError(409, `Already connected to ${config.url}. Disconnect first.`);
   await checkPrivate(url);
   // Your git login must be able to read it (and later write to it).
-  const probe = await run("git", ["ls-remote", "--heads", url], { timeoutMs: 60_000, env: { GIT_TERMINAL_PROMPT: "0", GIT_SSH_COMMAND: "ssh -o BatchMode=yes" } });
+  const probe = await run("git", ["ls-remote", "--heads", url], {
+    timeoutMs: 60_000,
+    env: { GIT_TERMINAL_PROMPT: "0", GIT_SSH_COMMAND: "ssh -o BatchMode=yes" },
+  });
   if (probe.error) throw new HttpError(503, "git isn't installed");
   if (probe.code !== 0) throw networkError(probe.stderr);
   await exclusive(async () => {
@@ -439,7 +455,11 @@ async function checkUploadable(paths: string[]) {
     const secret = findSecret(await readFile(abs, "utf8").catch(() => ""));
     if (secret) problems.push(`${path} contains what looks like ${secret}`);
   }
-  if (problems.length) throw new HttpError(400, `Not uploaded, to keep secrets and oversized files out of the repository: ${problems.join("; ")}. Remove it from the file, then upload again.`);
+  if (problems.length)
+    throw new HttpError(
+      400,
+      `Not uploaded, to keep secrets and oversized files out of the repository: ${problems.join("; ")}. Remove it from the file, then upload again.`,
+    );
 }
 
 // ---- Upload ----------------------------------------------------------------------------------------------------
@@ -472,7 +492,9 @@ export async function uploadSync(): Promise<SyncStatus> {
     // Data, snapshot history and labels in one push: all of it lands, or none of it does. --prune removes
     // labels deleted here (the repository has nothing this computer doesn't, checked above).
     try {
-      await gitOk(["push", "-q", "--atomic", "--prune", "origin", ...(commit ? [`HEAD:refs/heads/${BRANCH}`] : []), ...(await historyPushRefspecs(syncGit))], { network: true });
+      await gitOk(["push", "-q", "--atomic", "--prune", "origin", ...(commit ? [`HEAD:refs/heads/${BRANCH}`] : []), ...(await historyPushRefspecs(syncGit))], {
+        network: true,
+      });
     } catch (e) {
       // Not uploaded: undo the commit, keeping every change here as it was, so nothing is lost or half-done.
       if (paths.length) {
@@ -499,7 +521,17 @@ async function commitIdentity(): Promise<string[]> {
 
 function uploadMessage(changes: Map<string, SyncChange>): string {
   const n = changes.size;
-  const kinds = new Set([...changes.keys()].map((p) => (p.startsWith(".resume-studio/tailor/") ? "tailoring sessions" : p.startsWith("resumes/_profile/") ? "facts" : p.startsWith("resumes/") ? "resumes" : "settings")));
+  const kinds = new Set(
+    [...changes.keys()].map((p) =>
+      p.startsWith(".resume-studio/tailor/")
+        ? "tailoring sessions"
+        : p.startsWith("resumes/_profile/")
+          ? "facts"
+          : p.startsWith("resumes/")
+            ? "resumes"
+            : "settings",
+    ),
+  );
   return `Upload from ${hostname().replace(/\.local$/, "")}: ${n} file${n === 1 ? "" : "s"} (${[...kinds].join(", ")})`;
 }
 
@@ -537,16 +569,20 @@ export async function downloadSync(resolutions: Resolutions = {}): Promise<SyncS
 /** Refuses before anything is downloaded: unanswered conflicts, or files that aren't Resume Studio data. */
 async function checkDataDownload(p: Plan, resolutions: Resolutions) {
   const unresolved = [...p.conflicts.keys()].filter((x) => resolutions[x] !== "local" && resolutions[x] !== "remote");
-  if (unresolved.length) throw new HttpError(409, `Choose which version to keep for ${unresolved.length} file${unresolved.length === 1 ? "" : "s"} changed in both places.`);
+  if (unresolved.length)
+    throw new HttpError(409, `Choose which version to keep for ${unresolved.length} file${unresolved.length === 1 ? "" : "s"} changed in both places.`);
   // Only data paths may come from the repository: anything else would land in the app's own folder.
   const remoteFiles = (await gitOk(["ls-tree", "-r", "-z", "--name-only", p.remote!])).split("\0").filter(Boolean);
   const foreign = remoteFiles.filter((f) => !isSynced(f));
-  if (foreign.length) throw new HttpError(400, `The repository contains files that aren't Resume Studio data (${foreign.slice(0, 3).join(", ")}). Download refused, so nothing outside your data is touched.`);
+  if (foreign.length)
+    throw new HttpError(
+      400,
+      `The repository contains files that aren't Resume Studio data (${foreign.slice(0, 3).join(", ")}). Download refused, so nothing outside your data is touched.`,
+    );
 }
 
 /** The data part of a download (after checkDataDownload): the repository's files, with your unuploaded changes and choices kept. */
 async function downloadData(p: Plan, resolutions: Resolutions) {
-
   // Kept and put back after the repository's version is checked out: your changes not uploaded yet, and
   // the conflicts where you chose this computer's version. Replaced: conflicts where you chose the
   // repository's (a copy goes to backups).
@@ -658,7 +694,13 @@ async function diffText(path: string, before: string | null, after: string | nul
     const text = r.stdout
       .split("\n")
       .filter((l) => !/^(diff --git|index |new file mode|deleted file mode)/.test(l))
-      .map((l) => (l.startsWith("--- ") ? `--- ${labels[0]}${before === null ? " (none)" : ""}` : l.startsWith("+++ ") ? `+++ ${labels[1]}${after === null ? " (none)" : ""}` : l))
+      .map((l) =>
+        l.startsWith("--- ")
+          ? `--- ${labels[0]}${before === null ? " (none)" : ""}`
+          : l.startsWith("+++ ")
+            ? `+++ ${labels[1]}${after === null ? " (none)" : ""}`
+            : l,
+      )
       .join("\n");
     return { path, binary: false, text: text.length > 400_000 ? `${text.slice(0, 400_000)}\n… (cut: the rest is too long to show)` : text };
   } finally {

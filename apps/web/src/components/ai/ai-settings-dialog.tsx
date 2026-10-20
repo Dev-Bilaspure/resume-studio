@@ -30,7 +30,8 @@ export function AiSettingsDialog({ open, onOpenChange, initialProvider, onSaved 
         <DialogHeader className="border-b px-5 py-4">
           <DialogTitle>AI provider</DialogTitle>
           <DialogDescription>
-            Tailoring runs on the model you pick here. Keys stay on this computer (in the macOS Keychain; on Linux and Windows, in a file only you can read) and never reach the browser.
+            Tailoring runs on the model you pick here. Keys stay on this computer (in the macOS Keychain; on Linux and Windows, in a file only you can read) and
+            never reach the browser.
           </DialogDescription>
         </DialogHeader>
         {/* Mounted per opening, so unsaved edits don't linger. */}

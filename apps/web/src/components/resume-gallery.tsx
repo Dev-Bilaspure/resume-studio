@@ -72,7 +72,13 @@ function SyncButton() {
     );
   }, []);
   return (
-    <Button size="sm" variant="ghost" nativeButton={false} render={<Link href="/sync" />} title={pending ? `${pending} change${pending === 1 ? "" : "s"} not uploaded` : "Backup & sync"}>
+    <Button
+      size="sm"
+      variant="ghost"
+      nativeButton={false}
+      render={<Link href="/sync" />}
+      title={pending ? `${pending} change${pending === 1 ? "" : "s"} not uploaded` : "Backup & sync"}
+    >
       <Cloud />
       Sync
       {pending ? <span className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground tabular-nums">{pending}</span> : null}
@@ -252,7 +258,10 @@ export function ResumeGallery() {
                       <ScoreBadge score={r.build.score} />
                     </div>
                     {r.application && (
-                      <p className="mt-1 flex items-center gap-1 truncate text-[11px] text-primary" title={`Tailored for ${r.application.role} at ${r.application.company}`}>
+                      <p
+                        className="mt-1 flex items-center gap-1 truncate text-[11px] text-primary"
+                        title={`Tailored for ${r.application.role} at ${r.application.company}`}
+                      >
                         <Sparkles className="size-3 shrink-0" />
                         <span className="truncate">
                           {r.application.company} · {r.application.role}

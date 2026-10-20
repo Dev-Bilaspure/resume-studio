@@ -19,7 +19,12 @@ const Start = z.object({
     notes: z.string().max(4000).optional(),
   }),
   options: z
-    .object({ maxPages: z.number().int().min(1).max(4).optional(), allowHeadline: z.boolean().optional(), allowNewSkills: z.boolean().optional(), askQuestions: z.boolean().optional() })
+    .object({
+      maxPages: z.number().int().min(1).max(4).optional(),
+      allowHeadline: z.boolean().optional(),
+      allowNewSkills: z.boolean().optional(),
+      askQuestions: z.boolean().optional(),
+    })
     .optional(),
   provider: z.enum(["claude-code", "openai", "anthropic", "vertex"]).optional(),
   model: z.string().max(200).optional(),

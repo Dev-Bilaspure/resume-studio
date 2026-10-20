@@ -39,7 +39,12 @@ export function PreferencesMirror() {
     const push = async (values: Record<string, string>, keepalive = false) => {
       pushed = values;
       try {
-        const res = await fetch("/api/preferences", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values }), keepalive });
+        const res = await fetch("/api/preferences", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ values }),
+          keepalive,
+        });
         if (res.ok) localStorage.setItem(MARK, ((await res.json()) as Prefs).updatedAt ?? "");
       } catch {
         pushed = null; // try again next time

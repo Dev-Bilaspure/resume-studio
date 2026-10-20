@@ -18,7 +18,7 @@ export function plain(markup: string): string {
 export function markupProblems(markup: string): string[] {
   const out: string[] = [];
   const withoutLinks = markup.replace(/\[([^\]]*)\]\(([^)]*)\)/g, "$1");
-  if (((withoutLinks.match(/\*\*/g) ?? []).length) % 2) out.push("unbalanced ** (bold)");
+  if ((withoutLinks.match(/\*\*/g) ?? []).length % 2) out.push("unbalanced ** (bold)");
   const singles = withoutLinks.replace(/\*\*/g, "").match(/\*/g) ?? [];
   if (singles.length % 2) out.push("unbalanced * (italic)");
   if (/\\[A-Za-z]+/.test(markup)) out.push("contains a LaTeX command; use **bold** / *italic* markup instead");
